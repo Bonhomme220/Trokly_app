@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Trokly brand palette */
+  --color-ink: #0B1A2B;
+  --color-signal: #00D084;
+  --color-paper: #F7F5F0;
+  --color-signal-dim: #00B070;
+  --color-ink-light: #1E2F42;
+  --color-muted: #8A99AA;
+  --color-error: #FF4444;
+  --color-warning: #FFC107;
+
+  /* Semantic aliases */
+  --color-background: var(--color-paper);
+  --color-foreground: var(--color-ink);
+  --color-primary: var(--color-signal);
+  --color-primary-hover: var(--color-signal-dim);
+
+  /* Typography */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-jetbrains-mono);
+
+  /* Radius */
+  --radius-card: 18px;
+  --radius-pill: 9999px;
+  --radius-input: 12px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #F7F5F0;
+  color: #0B1A2B;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* JetBrains Mono for technical data */
+.font-mono,
+[data-mono] {
+  font-family: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+}
+
+/* Trokly card */
+.card {
+  background: white;
+  border-radius: 18px;
+  border: 1px solid rgba(11, 26, 43, 0.08);
+}
+
+/* Pill button base */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 600;
+  border-radius: 9999px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  text-decoration: none;
+}
+
+.btn:focus-visible {
+  outline: 2px solid #00D084;
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background-color: #00D084;
+  color: #0B1A2B;
+  padding: 12px 24px;
+}
+
+.btn-primary:hover {
+  background-color: #00B070;
+}
+
+.btn-secondary {
+  background-color: transparent;
+  color: #0B1A2B;
+  border: 1.5px solid rgba(11, 26, 43, 0.2);
+  padding: 11px 24px;
+}
+
+.btn-secondary:hover {
+  border-color: #0B1A2B;
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: #0B1A2B;
+  padding: 12px 24px;
+}
+
+.btn-ghost:hover {
+  background-color: rgba(11, 26, 43, 0.06);
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.btn-lg {
+  padding: 16px 32px;
+  font-size: 18px;
+}
+
+/* Input */
+.input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1.5px solid rgba(11, 26, 43, 0.15);
+  border-radius: 12px;
+  background: white;
+  color: #0B1A2B;
+  font-size: 16px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input:focus {
+  border-color: #00D084;
+}
+
+.input::placeholder {
+  color: #8A99AA;
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.badge-signal {
+  background-color: rgba(0, 208, 132, 0.12);
+  color: #00B070;
+}
+
+.badge-ink {
+  background-color: rgba(11, 26, 43, 0.08);
+  color: #0B1A2B;
+}
+
+.badge-warning {
+  background-color: rgba(255, 193, 7, 0.15);
+  color: #B8860B;
+}
+
+.badge-error {
+  background-color: rgba(255, 68, 68, 0.1);
+  color: #CC0000;
+}
+
+/* Divider */
+.divider {
+  height: 1px;
+  background: rgba(11, 26, 43, 0.08);
+  border: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(11, 26, 43, 0.15);
+  border-radius: 9999px;
+}

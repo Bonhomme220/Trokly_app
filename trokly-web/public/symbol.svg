@@ -1,0 +1,5 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <title>Trokly — Symbole</title>
+  <rect width="512" height="512" rx="112" fill="#0B1A2B"/>
+  <path d="M80 256 L208 384 L432 144" stroke="#00D084" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

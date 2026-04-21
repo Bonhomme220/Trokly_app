@@ -1,0 +1,26 @@
+# API
+trokly-api/.env
+trokly-api/vendor/
+trokly-api/storage/logs/*.log
+trokly-api/storage/framework/cache/data/
+trokly-api/storage/framework/sessions/
+trokly-api/storage/framework/views/
+trokly-api/bootstrap/cache/*.php
+trokly-api/node_modules/
+trokly-api/database/database.sqlite
+
+# Web
+trokly-web/.env
+trokly-web/.env.local
+trokly-web/node_modules/
+trokly-web/.next/
+
+# AI
+trokly-ai/__pycache__/
+trokly-ai/*.pyc
+trokly-ai/venv/
+trokly-ai/.env
+
+# OS
+.DS_Store
+Thumbs.db
