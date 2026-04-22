@@ -1,0 +1,81 @@
+databases:
+  - name: trokly-db
+    databaseName: trokly
+    user: trokly
+    plan: free
+
+services:
+  # ── Laravel API ──────────────────────────────────────────────
+  - type: web
+    name: trokly-api
+    runtime: docker
+    rootDir: trokly-api
+    plan: free
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromDatabase:
+          name: trokly-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: trokly-db
+          property: port
+      - key: DB_DATABASE
+        fromDatabase:
+          name: trokly-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: trokly-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: trokly-db
+          property: password
+      - key: FRONTEND_URL
+        value: https://trokly-web.onrender.com
+      - key: SANCTUM_STATEFUL_DOMAINS
+        value: trokly-web.onrender.com
+      - key: SESSION_DRIVER
+        value: cookie
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: database
+      - key: AI_SERVICE_URL
+        value: https://trokly-ai.onrender.com
+
+  # ── Next.js Frontend ─────────────────────────────────────────
+  - type: web
+    name: trokly-web
+    runtime: node
+    rootDir: trokly-web
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://trokly-api.onrender.com/api
+      - key: NODE_ENV
+        value: production
+
+  # ── FastAPI AI Service ────────────────────────────────────────
+  - type: web
+    name: trokly-ai
+    runtime: python
+    rootDir: trokly-ai
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
