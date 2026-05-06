@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import PhotoUpload from "@/components/ui/PhotoUpload";
 import { CONDITION_LABELS, CONDITION_OPTIONS, formatPrice } from "@/lib/utils";
 import { Sparkles, Shield } from "lucide-react";
 import Link from "next/link";
@@ -34,7 +35,7 @@ export default function NewListingPage() {
     asking_price: "",
     accepts_trade: false,
     sale_type: "marketplace",
-    photos: ["", "", "", "", "", ""],
+    photos: [] as string[],
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -48,12 +49,6 @@ export default function NewListingPage() {
 
   function setField(key: string, value: unknown) {
     setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  function setPhoto(index: number, url: string) {
-    const photos = [...form.photos];
-    photos[index] = url;
-    setForm((f) => ({ ...f, photos }));
   }
 
   async function submit() {
@@ -277,25 +272,14 @@ export default function NewListingPage() {
         <div className="card p-5">
           <h2 className="font-semibold mb-1" style={{ color: "#0B1A2B" }}>Photos (minimum 6)</h2>
           <p className="text-xs mb-4" style={{ color: "#8A99AA" }}>
-            Collez les URLs de vos photos (Cloudinary, imgur, etc.)
+            Appuyez sur un emplacement pour importer une photo depuis votre appareil.
           </p>
-          <div className="space-y-2">
-            {form.photos.map((url, i) => (
-              <Input
-                key={i}
-                placeholder={`Photo ${i + 1} — URL`}
-                value={url}
-                onChange={(e) => setPhoto(i, e.target.value)}
-              />
-            ))}
-            <button
-              className="text-sm font-medium"
-              style={{ color: "#00D084" }}
-              onClick={() => setForm((f) => ({ ...f, photos: [...f.photos, ""] }))}
-            >
-              + Ajouter une photo
-            </button>
-          </div>
+          <PhotoUpload
+            photos={form.photos}
+            onChange={(photos) => setForm((f) => ({ ...f, photos }))}
+            min={6}
+            max={10}
+          />
         </div>
 
         {/* Description */}

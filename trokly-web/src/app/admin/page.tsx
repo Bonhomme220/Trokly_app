@@ -10,11 +10,11 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import {
   LayoutDashboard, Package, Microscope, CreditCard,
-  CheckCircle, XCircle, Eye, TrendingUp, ShoppingBag, Users, Clock,
-  AlertTriangle, Ban, UserCheck
+  CheckCircle, XCircle, TrendingUp, ShoppingBag, Users, Clock,
+  AlertTriangle, Ban, UserCheck, UserPlus, Shield
 } from "lucide-react";
 
-type Tab = "overview" | "listings" | "expertises" | "transactions" | "users" | "litigations";
+type Tab = "overview" | "listings" | "expertises" | "transactions" | "users" | "litigations" | "staff";
 
 interface DashboardStats {
   total_listings: number;
@@ -37,10 +37,16 @@ export default function AdminDashboard() {
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [staffList, setStaffList] = useState<User[]>([]);
+  const [staffForm, setStaffForm] = useState({ full_name: "", phone_number: "", role: "expert" });
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffError, setStaffError] = useState("");
+  const [staffSuccess, setStaffSuccess] = useState("");
   const [litigations, setLitigations] = useState<Litigation[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
+  const isSuperAdmin = user?.roles?.includes("super_admin");
   const isAdmin = user?.roles?.some((r) => ["admin", "super_admin"].includes(r));
   const isExpert = user?.roles?.includes("expert");
   const canAccess = isAdmin || isExpert;
@@ -84,6 +90,9 @@ export default function AdminDashboard() {
       } else if (tab === "users") {
         const res = await api.get("/admin/users?per_page=100").catch(() => ({ data: { data: [] } }));
         setUsers(res.data.data || res.data || []);
+      } else if (tab === "staff") {
+        const res = await api.get("/admin/staff").catch(() => ({ data: { data: [] } }));
+        setStaffList(res.data.data || []);
       } else if (tab === "litigations") {
         const res = await api.get("/admin/litigations?per_page=100").catch(() => ({ data: { data: [] } }));
         setLitigations(res.data.data || res.data || []);
@@ -133,6 +142,29 @@ export default function AdminDashboard() {
     }
   }
 
+  async function createStaff() {
+    setStaffError("");
+    setStaffSuccess("");
+    if (!staffForm.full_name.trim() || !staffForm.phone_number.trim()) {
+      return setStaffError("Nom et numéro requis.");
+    }
+    setStaffLoading(true);
+    try {
+      const res = await api.post("/admin/staff", staffForm);
+      setStaffSuccess(`Compte créé : ${res.data.user.full_name}`);
+      setStaffForm({ full_name: "", phone_number: "", role: "expert" });
+      setStaffList(prev => [res.data.user, ...prev]);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
+      const msg = err.response?.data?.errors
+        ? Object.values(err.response.data.errors)[0]?.[0]
+        : err.response?.data?.message;
+      setStaffError(msg || "Erreur lors de la création.");
+    } finally {
+      setStaffLoading(false);
+    }
+  }
+
   async function toggleUserActive(id: number, active: boolean) {
     setActionLoading(id);
     try {
@@ -158,6 +190,7 @@ export default function AdminDashboard() {
     ...(isAdmin ? [{ key: "transactions", label: "Transactions", icon: CreditCard, badge: pendingTx.length }] : []),
     ...(isAdmin ? [{ key: "litigations", label: "Litiges", icon: AlertTriangle, badge: openLitigations.length }] : []),
     ...(isAdmin ? [{ key: "users", label: "Utilisateurs", icon: Users }] : []),
+    ...(isSuperAdmin ? [{ key: "staff", label: "Équipe", icon: Shield }] : []),
   ] as { key: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[];
 
   return (
@@ -396,6 +429,78 @@ export default function AdminDashboard() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── STAFF ── */}
+          {tab === "staff" && isSuperAdmin && (
+            <div className="space-y-6">
+              {/* Formulaire création */}
+              <div className="card p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <UserPlus size={16} style={{ color: "#00D084" }} />
+                  <h2 className="font-semibold" style={{ color: "#0B1A2B" }}>Créer un compte staff</h2>
+                </div>
+                <div className="space-y-3">
+                  <input
+                    className="input"
+                    placeholder="Nom complet"
+                    value={staffForm.full_name}
+                    onChange={e => setStaffForm(f => ({ ...f, full_name: e.target.value }))}
+                  />
+                  <input
+                    className="input font-mono"
+                    placeholder="Numéro de téléphone (+229...)"
+                    value={staffForm.phone_number}
+                    onChange={e => setStaffForm(f => ({ ...f, phone_number: e.target.value }))}
+                  />
+                  <select
+                    className="input"
+                    value={staffForm.role}
+                    onChange={e => setStaffForm(f => ({ ...f, role: e.target.value }))}
+                  >
+                    <option value="expert">Expert</option>
+                    <option value="delivery_agent">Livreur</option>
+                    <option value="admin">Administrateur</option>
+                  </select>
+                  {staffError && <p className="text-xs" style={{ color: "#CC0000" }}>{staffError}</p>}
+                  {staffSuccess && <p className="text-xs font-medium" style={{ color: "#00B070" }}>{staffSuccess}</p>}
+                  <Button className="w-full" loading={staffLoading} onClick={createStaff}>
+                    <UserPlus size={14} /> Créer le compte
+                  </Button>
+                </div>
+              </div>
+
+              {/* Liste staff existants */}
+              <div>
+                <h2 className="font-semibold mb-3" style={{ color: "#0B1A2B" }}>Membres de l'équipe ({staffList.length})</h2>
+                <div className="space-y-2">
+                  {staffList.length === 0 ? (
+                    <p className="text-sm text-center py-8" style={{ color: "#8A99AA" }}>Aucun staff pour l'instant.</p>
+                  ) : staffList.map(u => (
+                    <div key={u.id} className="card p-4 flex items-center gap-3">
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                        style={{ background: "#0B1A2B", color: "#00D084" }}
+                      >
+                        {u.full_name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>{u.full_name}</p>
+                        <p className="text-xs font-mono" style={{ color: "#8A99AA" }}>{u.phone_number || u.phone}</p>
+                      </div>
+                      <div className="flex gap-1 flex-wrap">
+                        {u.roles?.map(r => (
+                          <span key={r} className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                            style={{ background: "rgba(0,208,132,0.12)", color: "#00B070" }}>
+                            {r === "expert" ? "Expert" : r === "delivery_agent" ? "Livreur" : r === "admin" ? "Admin" : "Super Admin"}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

@@ -39,6 +39,12 @@ return [
         'url' => env('AI_SERVICE_URL', 'http://localhost:8001'),
     ],
 
+    'cloudinary' => [
+        'cloud_name' => env('CLOUDINARY_CLOUD_NAME', 'di5yktbll'),
+        'api_key'    => env('CLOUDINARY_API_KEY', '716325859162172'),
+        'api_secret' => env('CLOUDINARY_API_SECRET'),
+    ],
+
     'payplus' => [
         'api_key' => env('PAYPLUS_API_KEY'),
         'secret_key' => env('PAYPLUS_SECRET_KEY'),

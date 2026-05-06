@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\OtpController;
+use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\Api\ListingController;
 use App\Http\Controllers\Api\TradeController;
 use App\Http\Controllers\Api\TransactionController;
@@ -34,6 +35,9 @@ Route::get('listings/{listing}', [ListingController::class, 'show']);
 
 // Routes authentifiées
 Route::middleware('auth:sanctum')->group(function () {
+
+    // Upload Cloudinary
+    Route::post('upload', [UploadController::class, 'store']);
 
     // KYC
     Route::post('kyc', [KycController::class, 'submit']);
@@ -84,6 +88,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('users/{user}/toggle-active', [AdminUserController::class, 'toggleActive']);
         Route::post('users/{user}/kyc/approve', [AdminUserController::class, 'approveKyc']);
         Route::post('users/{user}/kyc/reject', [AdminUserController::class, 'rejectKyc']);
+
+        // Staff (super_admin seulement)
+        Route::get('staff', [AdminUserController::class, 'staff'])->middleware('role:super_admin');
+        Route::post('staff', [AdminUserController::class, 'createStaff'])->middleware('role:super_admin');
 
         // Annonces
         Route::get('listings', [AdminListingController::class, 'index']);

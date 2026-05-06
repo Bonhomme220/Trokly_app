@@ -17,6 +17,7 @@ const IPHONE_MODELS = [
 
 const CAPACITIES = [64, 128, 256, 512, 1024];
 import Button from "@/components/ui/Button";
+import PhotoUpload from "@/components/ui/PhotoUpload";
 import Link from "next/link";
 import { ChevronLeft, Save } from "lucide-react";
 
@@ -40,7 +41,6 @@ export default function EditListingPage() {
     description: "",
     accepts_trade: false,
     photos: [] as string[],
-    newPhotoUrl: "",
   });
 
   useEffect(() => {
@@ -63,20 +63,10 @@ export default function EditListingPage() {
           description: l.description || "",
           accepts_trade: l.accepts_trade,
           photos: l.photos?.map(p => p.url) ?? [],
-          newPhotoUrl: "",
         });
       })
       .finally(() => setDataLoading(false));
   }, [id, isAuthenticated, user?.id, router]);
-
-  function addPhoto() {
-    if (!form.newPhotoUrl.trim()) return;
-    setForm(f => ({ ...f, photos: [...f.photos, f.newPhotoUrl.trim()], newPhotoUrl: "" }));
-  }
-
-  function removePhoto(idx: number) {
-    setForm(f => ({ ...f, photos: f.photos.filter((_, i) => i !== idx) }));
-  }
 
   async function save() {
     setError("");
@@ -194,31 +184,12 @@ export default function EditListingPage() {
           {/* Photos */}
           <div>
             <label className="text-sm font-medium block mb-2" style={{ color: "#0B1A2B" }}>Photos</label>
-            {form.photos.length > 0 && (
-              <div className="flex gap-2 mb-2 flex-wrap">
-                {form.photos.map((url, i) => (
-                  <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden" style={{ background: "#F0EDE8" }}>
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => removePhoto(i)}
-                      className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold"
-                      style={{ background: "rgba(204,0,0,0.85)", color: "white" }}
-                    >×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex gap-2">
-              <input
-                type="url"
-                className="input flex-1 text-sm"
-                placeholder="URL photo (Cloudinary, Drive…)"
-                value={form.newPhotoUrl}
-                onChange={e => setForm(f => ({ ...f, newPhotoUrl: e.target.value }))}
-                onKeyDown={e => e.key === "Enter" && addPhoto()}
-              />
-              <Button type="button" variant="secondary" size="sm" onClick={addPhoto}>Ajouter</Button>
-            </div>
+            <PhotoUpload
+              photos={form.photos}
+              onChange={(photos) => setForm(f => ({ ...f, photos }))}
+              min={1}
+              max={10}
+            />
           </div>
 
           {/* Accepts trade */}

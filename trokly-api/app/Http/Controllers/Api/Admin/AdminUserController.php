@@ -4,11 +4,54 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Wallet;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AdminUserController extends Controller
 {
+    public function createStaff(Request $request): JsonResponse
+    {
+        $request->validate([
+            'full_name'    => 'required|string|max:100',
+            'phone_number' => 'required|string|unique:users,phone_number',
+            'role'         => 'required|in:expert,delivery_agent,admin',
+        ]);
+
+        $user = User::create([
+            'full_name'      => $request->full_name,
+            'phone_number'   => $request->phone_number,
+            'phone_verified' => true,
+            'is_active'      => true,
+        ]);
+
+        Wallet::create(['user_id' => $user->id]);
+        $user->assignRole($request->role);
+
+        $userData          = $user->toArray();
+        $userData['roles'] = $user->getRoleNames()->values();
+
+        return response()->json([
+            'message' => 'Compte staff créé avec succès.',
+            'user'    => $userData,
+        ], 201);
+    }
+
+    public function staff(Request $request): JsonResponse
+    {
+        $users = User::with('kyc')
+            ->whereHas('roles', fn($q) => $q->whereIn('name', ['expert', 'delivery_agent', 'admin', 'super_admin']))
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($u) {
+                $data          = $u->toArray();
+                $data['roles'] = $u->getRoleNames()->values();
+                return $data;
+            });
+
+        return response()->json(['data' => $users]);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $query = User::with('kyc')->role('buyer_seller');
