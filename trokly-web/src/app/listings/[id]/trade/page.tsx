@@ -7,6 +7,7 @@ import { Listing } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import PhotoUpload from "@/components/ui/PhotoUpload";
 import { CONDITION_LABELS, CONDITION_OPTIONS, formatPrice } from "@/lib/utils";
 import { Sparkles, ArrowLeftRight } from "lucide-react";
 import Link from "next/link";
@@ -32,7 +33,7 @@ export default function TradeProposalPage() {
     initiator_condition: "good",
     initiator_imei: "",
     initiator_asking_soulte: "",
-    photos: ["", "", "", ""],
+    photos: [] as string[],
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -53,12 +54,6 @@ export default function TradeProposalPage() {
 
   function setField(key: string, value: unknown) {
     setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  function setPhoto(index: number, url: string) {
-    const photos = [...form.photos];
-    photos[index] = url;
-    setForm((f) => ({ ...f, photos }));
   }
 
   async function submit() {
@@ -212,23 +207,12 @@ export default function TradeProposalPage() {
           <p className="text-xs mb-4" style={{ color: "#8A99AA" }}>
             Recto, verso, écran allumé, IMEI visible
           </p>
-          <div className="space-y-2">
-            {form.photos.map((url, i) => (
-              <Input
-                key={i}
-                placeholder={`Photo ${i + 1} — URL`}
-                value={url}
-                onChange={(e) => setPhoto(i, e.target.value)}
-              />
-            ))}
-            <button
-              className="text-sm font-medium"
-              style={{ color: "#00D084" }}
-              onClick={() => setForm((f) => ({ ...f, photos: [...f.photos, ""] }))}
-            >
-              + Ajouter une photo
-            </button>
-          </div>
+          <PhotoUpload
+            photos={form.photos}
+            onChange={(photos) => setForm((f) => ({ ...f, photos }))}
+            min={4}
+            max={8}
+          />
         </div>
 
         {/* AI info */}
