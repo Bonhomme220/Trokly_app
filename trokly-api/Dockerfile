@@ -13,25 +13,21 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
 
-# Install PHP deps first (layer cache)
+# Install PHP deps (layer cache)
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 
 # Copy source
 COPY . .
 
-# Finalize composer
+# Finalize autoloader
 RUN composer dump-autoload --optimize
 
 # Permissions
-RUN chmod -R 775 storage bootstrap/cache \
-    && chown -R www-data:www-data storage bootstrap/cache
+RUN chmod -R 775 storage bootstrap/cache && \
+    chown -R www-data:www-data storage bootstrap/cache && \
+    chmod +x start.sh
 
 EXPOSE 10000
 
-CMD php artisan config:clear \
-    && php artisan config:cache \
-    && php artisan route:cache \
-    && php artisan migrate --force \
-    && php artisan db:seed --class=RolesSeeder --force \
-    && php artisan serve --host=0.0.0.0 --port=${PORT:-10000}
+CMD ["/bin/bash", "start.sh"]
