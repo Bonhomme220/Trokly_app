@@ -5,9 +5,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Bell, LogOut, Menu, X, ArrowLeftRight, LayoutDashboard, Truck, Microscope } from "lucide-react";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
+import { useLeadModal } from "@/contexts/LeadContext";
 
 export default function Navbar() {
   const { isAuthenticated, user, logout, hasRole } = useAuth();
+  const { openLeadModal } = useLeadModal();
   const isAdmin = hasRole("admin") || hasRole("super_admin");
   const isExpert = hasRole("expert");
   const isDelivery = hasRole("delivery_agent");
@@ -121,12 +123,8 @@ export default function Navbar() {
             </>
           ) : (
             <div className="flex items-center gap-2 ml-2">
-              <Link href="/login">
-                <Button variant="ghost" size="sm">Connexion</Button>
-              </Link>
-              <Link href="/listings/new">
-                <Button size="sm">Vendre mon iPhone</Button>
-              </Link>
+              <Button variant="ghost" size="sm" onClick={openLeadModal}>Connexion</Button>
+              <Button size="sm" onClick={openLeadModal}>Vendre mon iPhone</Button>
             </div>
           )}
         </div>
@@ -190,12 +188,12 @@ export default function Navbar() {
             </>
           ) : (
             <div className="flex flex-col gap-2 mt-2">
-              <Link href="/login" onClick={() => setMenuOpen(false)}>
-                <Button variant="secondary" className="w-full">Connexion</Button>
-              </Link>
-              <Link href="/listings/new" onClick={() => setMenuOpen(false)}>
-                <Button className="w-full">Vendre mon iPhone</Button>
-              </Link>
+              <Button variant="secondary" className="w-full" onClick={() => { setMenuOpen(false); openLeadModal(); }}>
+                Rejoindre la liste
+              </Button>
+              <Button className="w-full" onClick={() => { setMenuOpen(false); openLeadModal(); }}>
+                Vendre mon iPhone
+              </Button>
             </div>
           )}
         </div>

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\OtpController;
+use App\Http\Controllers\Api\LeadController;
 use App\Http\Controllers\Api\UploadController;
 use App\Http\Controllers\Api\ListingController;
 use App\Http\Controllers\Api\TradeController;
@@ -18,6 +19,10 @@ use App\Http\Controllers\Api\Admin\AdminDeliveryController;
 use App\Http\Controllers\Api\Admin\AdminLitigationController;
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
 use Illuminate\Support\Facades\Route;
+
+// Leads pré-lancement (public)
+Route::post('leads', [LeadController::class, 'store']);
+Route::get('leads', [LeadController::class, 'index'])->middleware(['auth:sanctum', 'role:admin|super_admin']);
 
 // Auth
 Route::prefix('auth')->group(function () {
