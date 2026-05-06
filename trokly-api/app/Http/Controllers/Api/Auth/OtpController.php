@@ -41,7 +41,8 @@ class OtpController extends Controller
         $valid = $this->otpService->verify(
             $request->phone_number,
             $request->code,
-            $request->type
+            $request->type,
+            false
         );
 
         if (!$valid) {

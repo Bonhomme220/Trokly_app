@@ -26,7 +26,7 @@ class OtpService
         return $code;
     }
 
-    public function verify(string $phoneNumber, string $code, string $type): bool
+    public function verify(string $phoneNumber, string $code, string $type, bool $consume = true): bool
     {
         $otp = OtpCode::where('phone_number', $phoneNumber)
             ->where('type', $type)
@@ -38,7 +38,9 @@ class OtpService
             return false;
         }
 
-        $otp->update(['used' => true]);
+        if ($consume) {
+            $otp->update(['used' => true]);
+        }
 
         return true;
     }
