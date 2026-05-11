@@ -10,14 +10,14 @@ class SuperAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        $phone = env('SUPER_ADMIN_PHONE');
-        if (!$phone) return;
+        $email = env('SUPER_ADMIN_EMAIL');
+        if (!$email) return;
 
         $user = User::firstOrCreate(
-            ['phone_number' => $phone],
+            ['email' => $email],
             [
                 'full_name'      => env('SUPER_ADMIN_NAME', 'Super Admin'),
-                'phone_verified' => true,
+                'email_verified' => true,
                 'is_active'      => true,
             ]
         );

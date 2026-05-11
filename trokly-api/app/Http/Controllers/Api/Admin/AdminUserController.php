@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ExpertProfile;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Http\JsonResponse;
@@ -10,18 +11,43 @@ use Illuminate\Http\Request;
 
 class AdminUserController extends Controller
 {
+    public function updateExpertProfile(Request $request, User $user): JsonResponse
+    {
+        if (!$user->hasRole('expert')) {
+            return response()->json(['message' => 'Cet utilisateur n\'est pas un expert.'], 422);
+        }
+
+        $request->validate([
+            'partner_name'     => 'required|string|max:150',
+            'address'          => 'required|string|max:255',
+            'city'             => 'required|string|max:60',
+            'phone'            => 'nullable|string|max:20',
+            'appointment_info' => 'nullable|string|max:500',
+        ]);
+
+        $profile = ExpertProfile::updateOrCreate(
+            ['user_id' => $user->id],
+            $request->only(['partner_name', 'address', 'city', 'phone', 'appointment_info'])
+        );
+
+        return response()->json([
+            'message' => 'Profil expert mis à jour.',
+            'profile' => $profile,
+        ]);
+    }
+
     public function createStaff(Request $request): JsonResponse
     {
         $request->validate([
-            'full_name'    => 'required|string|max:100',
-            'phone_number' => 'required|string|unique:users,phone_number',
-            'role'         => 'required|in:expert,delivery_agent,admin',
+            'full_name' => 'required|string|max:100',
+            'email'     => 'required|email|unique:users,email',
+            'role'      => 'required|in:expert,delivery_agent,admin',
         ]);
 
         $user = User::create([
             'full_name'      => $request->full_name,
-            'phone_number'   => $request->phone_number,
-            'phone_verified' => true,
+            'email'          => $request->email,
+            'email_verified' => true,
             'is_active'      => true,
         ]);
 

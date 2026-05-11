@@ -14,46 +14,30 @@ class OtpController extends Controller
     public function send(Request $request): JsonResponse
     {
         $request->validate([
-            'phone_number' => 'required|string|min:8|max:20',
-            'type' => 'required|in:registration,login,withdrawal',
+            'email' => 'required|email',
+            'type'  => 'required|in:registration,login,withdrawal',
         ]);
 
-        $code = $this->otpService->generate(
-            $request->phone_number,
-            $request->type
-        );
+        $code = $this->otpService->generate($request->email, $request->type);
+        $this->otpService->send($request->email, $code);
 
-        $this->otpService->send($request->phone_number, $code);
-
-        return response()->json([
-            'message' => 'Code OTP envoyé avec succès.',
-        ]);
+        return response()->json(['message' => 'Code OTP envoyé par email.']);
     }
 
     public function verify(Request $request): JsonResponse
     {
         $request->validate([
-            'phone_number' => 'required|string',
-            'code' => 'required|string|size:6',
-            'type' => 'required|in:registration,login,withdrawal',
+            'email' => 'required|email',
+            'code'  => 'required|string|size:6',
+            'type'  => 'required|in:registration,login,withdrawal',
         ]);
 
-        $valid = $this->otpService->verify(
-            $request->phone_number,
-            $request->code,
-            $request->type,
-            false
-        );
+        $valid = $this->otpService->verify($request->email, $request->code, $request->type, false);
 
         if (!$valid) {
-            return response()->json([
-                'message' => 'Code OTP invalide ou expiré.',
-            ], 422);
+            return response()->json(['message' => 'Code OTP invalide ou expiré.'], 422);
         }
 
-        return response()->json([
-            'message' => 'Code OTP vérifié.',
-            'verified' => true,
-        ]);
+        return response()->json(['message' => 'Code OTP vérifié.', 'verified' => true]);
     }
 }

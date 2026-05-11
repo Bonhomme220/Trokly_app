@@ -12,7 +12,7 @@ export default function AdminLoginPage() {
   const { login, isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -23,10 +23,10 @@ export default function AdminLoginPage() {
 
   async function sendOtp() {
     setError("");
-    if (!phone.trim()) return setError("Entrez votre numéro.");
+    if (!email.trim()) return setError("Entrez votre email.");
     setSubmitting(true);
     try {
-      await api.post("/auth/otp/send", { phone_number: phone, type: "login" });
+      await api.post("/auth/otp/send", { email, type: "login" });
       setStep("otp");
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
@@ -41,7 +41,7 @@ export default function AdminLoginPage() {
     if (otp.length !== 6) return setError("Code à 6 chiffres.");
     setSubmitting(true);
     try {
-      const res = await api.post("/auth/login", { phone_number: phone, code: otp });
+      const res = await api.post("/auth/login", { email, code: otp });
       await login(res.data.token);
       router.push("/admin");
     } catch (e: unknown) {
@@ -59,7 +59,7 @@ export default function AdminLoginPage() {
           <img src="/symbol.svg" alt="Trokly" className="mx-auto mb-4" style={{ width: 40, height: 40 }} />
           <h1 className="text-xl font-bold" style={{ color: "#0B1A2B" }}>Accès staff</h1>
           <p className="text-xs mt-1" style={{ color: "#8A99AA" }}>
-            {step === "phone" ? "Réservé à l'équipe Trokly" : `Code envoyé au ${phone}`}
+            {step === "phone" ? "Réservé à l'équipe Trokly" : `Code envoyé à ${email}`}
           </p>
         </div>
 
@@ -68,10 +68,10 @@ export default function AdminLoginPage() {
             <>
               <input
                 className="input"
-                type="tel"
-                placeholder="+229 97 00 00 00"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
+                type="email"
+                placeholder="votre@email.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && sendOtp()}
                 autoFocus
               />
@@ -102,7 +102,7 @@ export default function AdminLoginPage() {
                 style={{ color: "#8A99AA" }}
                 onClick={() => { setStep("phone"); setOtp(""); setError(""); }}
               >
-                Modifier le numéro
+                Modifier l'email
               </button>
             </>
           )}

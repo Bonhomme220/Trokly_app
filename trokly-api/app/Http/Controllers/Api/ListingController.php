@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ExpertProfile;
 use App\Models\Listing;
 use App\Models\ListingPhoto;
 use App\Services\AiService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -110,6 +112,16 @@ class ListingController extends Controller
                 'order' => $index,
             ]);
         }
+
+        // Notifier le vendeur avec les infos de l'expert partenaire disponible
+        $expertProfile = ExpertProfile::where('is_active', true)->inRandomOrder()->first();
+        app(NotificationService::class)->listingSubmitted(
+            $request->user(),
+            "{$listing->iphone_model} {$listing->capacity}Go",
+            $expertProfile?->partner_name,
+            $expertProfile ? "{$expertProfile->address}, {$expertProfile->city}" : null,
+            $expertProfile?->appointment_info
+        );
 
         return response()->json([
             'message' => 'Annonce soumise pour expertise.',

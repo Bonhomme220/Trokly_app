@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ExpertProfile;
 use App\Models\Listing;
 use App\Models\Trade;
 use App\Models\TradeOffer;
 use App\Models\TradePhoto;
 use App\Services\AiService;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -68,6 +70,15 @@ class TradeController extends Controller
                 'order' => $index,
             ]);
         }
+
+        $appUrl = config('app.url', 'https://trokly-web.onrender.com');
+        app(NotificationService::class)->tradeProposalReceived(
+            $listing->seller,
+            $request->user()->full_name,
+            "{$listing->iphone_model} {$listing->capacity}Go",
+            "{$request->initiator_iphone_model} {$request->initiator_capacity}Go",
+            "{$appUrl}/trades/{$trade->id}"
+        );
 
         return response()->json([
             'message' => 'Proposition de troc soumise.',
@@ -143,6 +154,16 @@ class TradeController extends Controller
 
         $trade->update(['status' => 'in_negotiation']);
 
+        // Notifier l'autre partie
+        $recipient = $user->id === $trade->initiator_id ? $trade->listing->seller : $trade->initiator;
+        $appUrl    = config('app.url', 'https://trokly-web.onrender.com');
+        app(NotificationService::class)->tradeOfferReceived(
+            $recipient,
+            $user->full_name,
+            $request->soulte_amount,
+            "{$appUrl}/trades/{$trade->id}"
+        );
+
         return response()->json(['message' => 'Offre soumise.']);
     }
 
@@ -158,7 +179,19 @@ class TradeController extends Controller
         $offer->update(['status' => 'accepted']);
         $trade->update(['status' => 'agreed']);
 
-        return response()->json(['message' => 'Offre acceptée. Expertise des deux téléphones en cours.']);
+        // Notifier les deux parties avec les infos de l'expert partenaire
+        $expertProfile = ExpertProfile::where('is_active', true)->inRandomOrder()->first();
+        $appUrl        = config('app.url', 'https://trokly-web.onrender.com');
+        $tradeUrl      = "{$appUrl}/trades/{$trade->id}";
+
+        $initiator = $trade->initiator;
+        $seller    = $trade->listing->seller;
+        $notif     = app(NotificationService::class);
+
+        $notif->tradeAgreed($initiator, $seller->full_name, $expertProfile?->partner_name, $expertProfile?->address ?? '', $tradeUrl);
+        $notif->tradeAgreed($seller, $initiator->full_name, $expertProfile?->partner_name, $expertProfile?->address ?? '', $tradeUrl);
+
+        return response()->json(['message' => 'Offre acceptée. Amenez votre iPhone chez l\'expert pour expertise.']);
     }
 
     public function refuseOffer(Request $request, Trade $trade, TradeOffer $offer): JsonResponse

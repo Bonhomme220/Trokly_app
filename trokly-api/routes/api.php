@@ -98,6 +98,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('staff', [AdminUserController::class, 'staff'])->middleware('role:super_admin');
         Route::post('staff', [AdminUserController::class, 'createStaff'])->middleware('role:super_admin');
 
+        // Profil expert partenaire
+        Route::put('staff/{user}/expert-profile', [AdminUserController::class, 'updateExpertProfile'])->middleware('role:super_admin');
+
         // Annonces
         Route::get('listings', [AdminListingController::class, 'index']);
         Route::post('listings/{listing}/publish', [AdminListingController::class, 'publish']);
@@ -139,6 +142,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('delivery')->middleware('role:delivery_agent|admin|super_admin')->group(function () {
         Route::get('my-deliveries', [AdminDeliveryController::class, 'myDeliveries']);
         Route::post('deliveries/{delivery}/pickup', [AdminDeliveryController::class, 'confirmPickup']);
+        Route::post('deliveries/{delivery}/pickup-check', [AdminDeliveryController::class, 'pickupCheck']);
         Route::post('deliveries/{delivery}/deliver', [AdminDeliveryController::class, 'confirmDelivery']);
     });
 });

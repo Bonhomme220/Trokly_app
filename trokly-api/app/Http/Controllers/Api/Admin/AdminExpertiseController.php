@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Expertise;
+use App\Models\ExpertProfile;
 use App\Models\Listing;
 use App\Models\PriceHistory;
 use App\Models\QuickSaleDecision;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -115,26 +117,35 @@ class AdminExpertiseController extends Controller
         }
 
         $expertise->update([
-            'status' => 'validated',
+            'status'       => 'validated',
             'completed_at' => now(),
         ]);
 
-        $expertise->listing->update([
+        $listing = $expertise->listing;
+        $listing->update([
             'quality_grade' => $expertise->quality_grade,
-            'status' => $expertise->listing->sale_type === 'quick_sale' ? 'pending_expertise' : 'published',
+            'status'        => $listing->sale_type === 'quick_sale' ? 'pending_expertise' : 'published',
         ]);
 
-        if ($expertise->listing->sale_type === 'marketplace') {
+        if ($listing->sale_type === 'marketplace') {
             PriceHistory::create([
-                'iphone_model' => $expertise->listing->iphone_model,
-                'capacity' => $expertise->listing->capacity,
-                'color' => $expertise->listing->color,
-                'condition' => $expertise->listing->condition,
-                'quality_grade' => $expertise->quality_grade,
-                'sale_price' => $expertise->listing->asking_price,
+                'iphone_model'     => $listing->iphone_model,
+                'capacity'         => $listing->capacity,
+                'color'            => $listing->color,
+                'condition'        => $listing->condition,
+                'quality_grade'    => $expertise->quality_grade,
+                'sale_price'       => $listing->asking_price,
                 'transaction_type' => 'marketplace',
-                'sale_date' => today(),
+                'sale_date'        => today(),
             ]);
+
+            $appUrl = config('app.url', 'https://trokly-web.onrender.com');
+            app(NotificationService::class)->listingPublished(
+                $listing->seller,
+                "{$listing->iphone_model} {$listing->capacity}Go",
+                $listing->asking_price,
+                "{$appUrl}/listings/{$listing->id}"
+            );
         }
 
         return response()->json(['message' => 'Expertise validée. Annonce publiée.']);
@@ -145,12 +156,19 @@ class AdminExpertiseController extends Controller
         $request->validate(['reason' => 'required|string']);
 
         $expertise->update([
-            'status' => 'rejected',
+            'status'           => 'rejected',
             'rejection_reason' => $request->reason,
-            'completed_at' => now(),
+            'completed_at'     => now(),
         ]);
 
-        $expertise->listing->update(['status' => 'rejected']);
+        $listing = $expertise->listing;
+        $listing->update(['status' => 'rejected']);
+
+        app(NotificationService::class)->listingRejected(
+            $listing->seller,
+            "{$listing->iphone_model} {$listing->capacity}Go",
+            $request->reason
+        );
 
         return response()->json(['message' => 'Expertise rejetée. Vendeur notifié.']);
     }

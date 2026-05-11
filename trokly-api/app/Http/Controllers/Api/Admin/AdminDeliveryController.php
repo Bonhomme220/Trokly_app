@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Delivery;
 use App\Models\Transaction;
+use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -80,6 +81,39 @@ class AdminDeliveryController extends Controller
             ->get();
 
         return response()->json($deliveries);
+    }
+
+    public function pickupCheck(Request $request, Delivery $delivery): JsonResponse
+    {
+        if ($delivery->agent_id !== $request->user()->id) {
+            return response()->json(['message' => 'Non autorisé.'], 403);
+        }
+
+        $request->validate([
+            'passed' => 'required|boolean',
+            'notes'  => 'nullable|string|max:500',
+        ]);
+
+        $delivery->update([
+            'pickup_check_passed'  => $request->passed,
+            'pickup_check_notes'   => $request->notes,
+            'pickup_checked_at'    => now(),
+            'status'               => $request->passed ? 'picked_up' : 'check_failed',
+        ]);
+
+        if (!$request->passed) {
+            $transaction = $delivery->transaction;
+            $seller      = $transaction->listing->seller;
+            $iphoneModel = "{$transaction->listing->iphone_model} {$transaction->listing->capacity}Go";
+
+            app(NotificationService::class)->pickupCheckFailed($seller, $iphoneModel, $request->notes ?? '');
+
+            return response()->json([
+                'message' => 'Contrôle échoué. Vendeur et admin notifiés. Transaction suspendue.',
+            ]);
+        }
+
+        return response()->json(['message' => 'Contrôle OK. Téléphone récupéré.']);
     }
 
     public function confirmPickup(Request $request, Delivery $delivery): JsonResponse
