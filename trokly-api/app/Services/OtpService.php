@@ -48,7 +48,7 @@ class OtpService
 
     public function send(string $email, string $code): void
     {
-        $apiKey = config('services.resend.key');
+        $apiKey = config('services.brevo.key');
 
         if (!$apiKey) {
             Log::info("OTP pour {$email}: {$code}");
@@ -74,17 +74,17 @@ class OtpService
         </body></html>";
 
         $response = Http::withHeaders([
-            'Authorization' => "Bearer {$apiKey}",
-            'Content-Type'  => 'application/json',
-        ])->post('https://api.resend.com/emails', [
-            'from'    => 'Trokly <noreply@trokly.bj>',
-            'to'      => [$email],
+            'api-key'      => $apiKey,
+            'Content-Type' => 'application/json',
+        ])->post('https://api.brevo.com/v3/smtp/email', [
+            'sender'  => ['name' => 'Trokly', 'email' => 'noreply@trokly.bj'],
+            'to'      => [['email' => $email]],
             'subject' => "Votre code Trokly : {$code}",
-            'html'    => $html,
+            'htmlContent' => $html,
         ]);
 
         if (!$response->successful()) {
-            Log::error("Resend OTP failed for {$email}: " . $response->body());
+            Log::error("Brevo OTP failed for {$email}: " . $response->body());
         }
     }
 }

@@ -39,7 +39,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [leads, setLeads] = useState<{ id: number; full_name: string; phone_number: string; profile: string; city: string; has_iphone_to_sell: boolean; created_at: string }[]>([]);
   const [staffList, setStaffList] = useState<User[]>([]);
-  const [staffForm, setStaffForm] = useState({ full_name: "", phone_number: "", role: "expert" });
+  const [staffForm, setStaffForm] = useState({ full_name: "", email: "", role: "expert" });
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
   const [staffSuccess, setStaffSuccess] = useState("");
@@ -149,14 +149,14 @@ export default function AdminDashboard() {
   async function createStaff() {
     setStaffError("");
     setStaffSuccess("");
-    if (!staffForm.full_name.trim() || !staffForm.phone_number.trim()) {
-      return setStaffError("Nom et numéro requis.");
+    if (!staffForm.full_name.trim() || !staffForm.email.trim()) {
+      return setStaffError("Nom et email requis.");
     }
     setStaffLoading(true);
     try {
       const res = await api.post("/admin/staff", staffForm);
       setStaffSuccess(`Compte créé : ${res.data.user.full_name}`);
-      setStaffForm({ full_name: "", phone_number: "", role: "expert" });
+      setStaffForm({ full_name: "", email: "", role: "expert" });
       setStaffList(prev => [res.data.user, ...prev]);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
@@ -513,10 +513,11 @@ export default function AdminDashboard() {
                     onChange={e => setStaffForm(f => ({ ...f, full_name: e.target.value }))}
                   />
                   <input
-                    className="input font-mono"
-                    placeholder="Numéro de téléphone (+229...)"
-                    value={staffForm.phone_number}
-                    onChange={e => setStaffForm(f => ({ ...f, phone_number: e.target.value }))}
+                    className="input"
+                    type="email"
+                    placeholder="email@exemple.com"
+                    value={staffForm.email}
+                    onChange={e => setStaffForm(f => ({ ...f, email: e.target.value }))}
                   />
                   <select
                     className="input"
@@ -551,7 +552,7 @@ export default function AdminDashboard() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>{u.full_name}</p>
-                        <p className="text-xs font-mono" style={{ color: "#8A99AA" }}>{u.phone_number || u.phone}</p>
+                        <p className="text-xs" style={{ color: "#8A99AA" }}>{u.email}</p>
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         {u.roles?.map(r => (
@@ -583,7 +584,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>{u.full_name}</p>
-                    <p className="text-xs font-mono" style={{ color: "#8A99AA" }}>{u.phone_number || u.phone}</p>
+                    <p className="text-xs" style={{ color: "#8A99AA" }}>{u.email}</p>
                     {u.roles?.length > 0 && (
                       <div className="flex gap-1 mt-0.5 flex-wrap">
                         {u.roles.map(r => (

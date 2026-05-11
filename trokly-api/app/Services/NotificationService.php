@@ -10,7 +10,7 @@ class NotificationService
 {
     private function send(string $to, string $subject, string $html): void
     {
-        $apiKey = config('services.resend.key');
+        $apiKey = config('services.brevo.key');
 
         if (!$apiKey) {
             Log::info("Email [{$subject}] → {$to}");
@@ -18,17 +18,17 @@ class NotificationService
         }
 
         $response = Http::withHeaders([
-            'Authorization' => "Bearer {$apiKey}",
-            'Content-Type'  => 'application/json',
-        ])->post('https://api.resend.com/emails', [
-            'from'    => 'Trokly <noreply@trokly.bj>',
-            'to'      => [$to],
-            'subject' => $subject,
-            'html'    => $html,
+            'api-key'      => $apiKey,
+            'Content-Type' => 'application/json',
+        ])->post('https://api.brevo.com/v3/smtp/email', [
+            'sender'      => ['name' => 'Trokly', 'email' => 'noreply@trokly.bj'],
+            'to'          => [['email' => $to]],
+            'subject'     => $subject,
+            'htmlContent' => $html,
         ]);
 
         if (!$response->successful()) {
-            Log::error("Email failed [{$subject}] → {$to}: " . $response->body());
+            Log::error("Brevo email failed [{$subject}] → {$to}: " . $response->body());
         }
     }
 
