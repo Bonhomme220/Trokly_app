@@ -21,7 +21,7 @@ class NotificationService
             'api-key'      => $apiKey,
             'Content-Type' => 'application/json',
         ])->post('https://api.brevo.com/v3/smtp/email', [
-            'sender'      => ['name' => 'Trokly', 'email' => 'noreply@trokly.bj'],
+            'sender'      => ['name' => 'Trokly', 'email' => 'contact.onepointcom@gmail.com'],
             'to'          => [['email' => $to]],
             'subject'     => $subject,
             'htmlContent' => $html,

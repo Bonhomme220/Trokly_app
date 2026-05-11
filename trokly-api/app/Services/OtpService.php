@@ -77,7 +77,7 @@ class OtpService
             'api-key'      => $apiKey,
             'Content-Type' => 'application/json',
         ])->post('https://api.brevo.com/v3/smtp/email', [
-            'sender'  => ['name' => 'Trokly', 'email' => 'noreply@trokly.bj'],
+            'sender'  => ['name' => 'Trokly', 'email' => 'contact.onepointcom@gmail.com'],
             'to'      => [['email' => $email]],
             'subject' => "Votre code Trokly : {$code}",
             'htmlContent' => $html,
