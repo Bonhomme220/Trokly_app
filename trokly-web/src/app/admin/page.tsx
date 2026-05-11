@@ -11,10 +11,10 @@ import Button from "@/components/ui/Button";
 import {
   LayoutDashboard, Package, Microscope, CreditCard,
   CheckCircle, XCircle, TrendingUp, ShoppingBag, Users, Clock,
-  AlertTriangle, Ban, UserCheck, UserPlus, Shield
+  AlertTriangle, Ban, UserCheck, UserPlus, Shield, ListChecks, Phone, MapPin
 } from "lucide-react";
 
-type Tab = "overview" | "listings" | "expertises" | "transactions" | "users" | "litigations" | "staff";
+type Tab = "overview" | "listings" | "expertises" | "transactions" | "users" | "litigations" | "staff" | "leads";
 
 interface DashboardStats {
   total_listings: number;
@@ -37,6 +37,7 @@ export default function AdminDashboard() {
   const [listings, setListings] = useState<AdminListing[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [leads, setLeads] = useState<{ id: number; full_name: string; phone_number: string; profile: string; city: string; has_iphone_to_sell: boolean; created_at: string }[]>([]);
   const [staffList, setStaffList] = useState<User[]>([]);
   const [staffForm, setStaffForm] = useState({ full_name: "", phone_number: "", role: "expert" });
   const [staffLoading, setStaffLoading] = useState(false);
@@ -93,6 +94,9 @@ export default function AdminDashboard() {
       } else if (tab === "staff") {
         const res = await api.get("/admin/staff").catch(() => ({ data: { data: [] } }));
         setStaffList(res.data.data || []);
+      } else if (tab === "leads") {
+        const res = await api.get("/leads").catch(() => ({ data: { data: [] } }));
+        setLeads(res.data.data || []);
       } else if (tab === "litigations") {
         const res = await api.get("/admin/litigations?per_page=100").catch(() => ({ data: { data: [] } }));
         setLitigations(res.data.data || res.data || []);
@@ -191,6 +195,7 @@ export default function AdminDashboard() {
     ...(isAdmin ? [{ key: "litigations", label: "Litiges", icon: AlertTriangle, badge: openLitigations.length }] : []),
     ...(isAdmin ? [{ key: "users", label: "Utilisateurs", icon: Users }] : []),
     ...(isSuperAdmin ? [{ key: "staff", label: "Équipe", icon: Shield }] : []),
+    ...(isSuperAdmin ? [{ key: "leads", label: "Leads", icon: ListChecks }] : []),
   ] as { key: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[];
 
   return (
@@ -429,6 +434,65 @@ export default function AdminDashboard() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* ── LEADS ── */}
+          {tab === "leads" && isSuperAdmin && (
+            <div className="space-y-4">
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: "Total leads", value: leads.length, color: "#0B1A2B" },
+                  { label: "Vendeurs potentiels", value: leads.filter(l => ["seller","both"].includes(l.profile)).length, color: "#00B070" },
+                  { label: "Ont un iPhone", value: leads.filter(l => l.has_iphone_to_sell).length, color: "#B8860B" },
+                ].map(s => (
+                  <div key={s.label} className="card p-4 text-center">
+                    <p className="text-2xl font-bold font-mono" style={{ color: s.color }}>{s.value}</p>
+                    <p className="text-xs mt-1" style={{ color: "#8A99AA" }}>{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Liste */}
+              <div className="space-y-2">
+                {leads.length === 0 ? (
+                  <p className="text-center py-12 text-sm" style={{ color: "#8A99AA" }}>Aucun lead pour l'instant.</p>
+                ) : leads.map(lead => (
+                  <div key={lead.id} className="card p-4 flex items-center gap-3">
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                      style={{ background: "#F0EDE8", color: "#0B1A2B" }}
+                    >
+                      {lead.full_name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>{lead.full_name}</p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <span className="flex items-center gap-1 text-xs" style={{ color: "#8A99AA" }}>
+                          <Phone size={11} /> {lead.phone_number}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs" style={{ color: "#8A99AA" }}>
+                          <MapPin size={11} /> {lead.city}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{
+                        background: lead.profile === "seller" ? "rgba(184,134,11,0.1)" : lead.profile === "both" ? "rgba(0,208,132,0.1)" : "rgba(11,26,43,0.06)",
+                        color: lead.profile === "seller" ? "#B8860B" : lead.profile === "both" ? "#00B070" : "#0B1A2B",
+                      }}>
+                        {lead.profile === "buyer" ? "Acheteur" : lead.profile === "seller" ? "Vendeur" : "Les deux"}
+                      </span>
+                      {lead.has_iphone_to_sell && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
+                          iPhone à vendre
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
