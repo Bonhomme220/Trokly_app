@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Listing } from "@/lib/types";
 import { CONDITION_LABELS, formatPrice } from "@/lib/utils";
-import { Zap, ArrowLeftRight, Shield } from "lucide-react";
+import { Zap, ArrowLeftRight, Shield, Eye } from "lucide-react";
 
 interface Props {
   listing: Listing;
@@ -113,6 +113,13 @@ export default function ListingCard({ listing }: Props) {
               </p>
             )}
           </div>
+
+          {listing.views_count > 0 && (
+            <div className="flex items-center gap-1 pt-1" style={{ color: "#8A99AA" }}>
+              <Eye size={11} />
+              <span className="text-xs">{listing.views_count} vue{listing.views_count > 1 ? "s" : ""}</span>
+            </div>
+          )}
         </div>
       </div>
     </Link>
