@@ -16,6 +16,7 @@ export interface User {
   email?: string;
   is_active: boolean;
   roles: string[];
+  listing_credits: number;
   kyc?: Kyc;
   wallet?: Wallet;
   created_at: string;
@@ -73,11 +74,16 @@ export interface Listing {
   quality_grade?: string;
   accepts_trade: boolean;
   sale_type: "marketplace" | "quick_sale";
+  plan?: "basic" | "verified_phone" | "verified_seller";
+  is_boosted?: boolean;
+  whatsapp_number?: string;
+  payment_status?: "pending_payment" | "paid";
+  expires_at?: string;
+  sold_at?: string;
   status: ListingStatus;
   views_count: number;
   photos: ListingPhoto[];
   expertise?: Expertise;
-  is_boosted?: boolean;
   created_at: string;
   updated_at: string;
 }
