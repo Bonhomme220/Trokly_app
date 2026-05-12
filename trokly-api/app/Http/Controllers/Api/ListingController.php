@@ -3,134 +3,169 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\ExpertProfile;
 use App\Models\Listing;
 use App\Models\ListingPhoto;
-use App\Services\AiService;
-use App\Services\NotificationService;
+use App\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ListingController extends Controller
 {
-    public function __construct(private AiService $aiService) {}
     public function index(Request $request): JsonResponse
     {
-        $query = Listing::with(['seller:id,full_name', 'photos' => fn($q) => $q->where('type', 'seller')->limit(1)])
-            ->where('status', 'published');
+        $query = Listing::with([
+            'seller:id,full_name,listing_credits,created_at',
+            'photos' => fn($q) => $q->where('type', 'seller')->orderBy('order')->limit(1),
+        ])
+            ->where('status', 'published')
+            ->where('payment_status', 'paid')
+            ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()));
 
-        if ($request->model) {
-            $query->where('iphone_model', $request->model);
-        }
+        if ($request->model)     $query->where('iphone_model', $request->model);
+        if ($request->condition) $query->where('condition', $request->condition);
+        if ($request->capacity)  $query->where('capacity', $request->capacity);
+        if ($request->min_price) $query->where('asking_price', '>=', $request->min_price);
+        if ($request->max_price) $query->where('asking_price', '<=', $request->max_price);
 
-        if ($request->condition) {
-            $query->where('condition', $request->condition);
-        }
+        if ($request->plan) $query->where('plan', $request->plan);
 
-        if ($request->capacity) {
-            $query->where('capacity', $request->capacity);
-        }
+        if ($request->boosted) $query->where('is_boosted', true);
 
-        if ($request->min_price) {
-            $query->where('asking_price', '>=', $request->min_price);
-        }
-
-        if ($request->max_price) {
-            $query->where('asking_price', '<=', $request->max_price);
-        }
-
-        if ($request->accepts_trade) {
-            $query->where('accepts_trade', true);
-        }
-
-        // Boostés en premier
-        $query->orderByRaw("EXISTS(SELECT 1 FROM boosts WHERE boosts.listing_id = listings.id AND boosts.status = 'active') DESC")
+        // Top (boostées) en premier, puis vendeur vérifié, puis vérifiées, puis basic
+        $query->orderByRaw("is_boosted DESC")
+              ->orderByRaw("CASE plan WHEN 'verified_seller' THEN 0 WHEN 'verified_phone' THEN 1 ELSE 2 END")
               ->orderBy('created_at', 'desc');
 
-        $listings = $query->paginate(20);
-
-        return response()->json($listings);
+        return response()->json($query->paginate(20));
     }
 
     public function show(Listing $listing): JsonResponse
     {
-        if ($listing->status !== 'published') {
+        if ($listing->status !== 'published' || $listing->payment_status !== 'paid') {
             return response()->json(['message' => 'Annonce non disponible.'], 404);
         }
 
         $listing->increment('views_count');
 
         $listing->load([
-            'seller:id,full_name',
+            'seller:id,full_name,listing_credits,created_at',
             'photos',
-            'expertise:id,listing_id,quality_grade,checklist,completed_at',
+            'expertise:id,listing_id,quality_grade,completed_at',
         ]);
 
-        return response()->json($listing);
+        // Nombre de ventes sur 6 mois pour ce vendeur
+        $salesCount = Listing::where('seller_id', $listing->seller_id)
+            ->where('status', 'sold')
+            ->where('sold_at', '>=', now()->subMonths(6))
+            ->count();
+
+        $data = $listing->toArray();
+        $data['seller']['sales_last_6_months'] = $salesCount;
+
+        return response()->json($data);
     }
 
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'iphone_model' => 'required|string|max:100',
-            'capacity' => 'required|in:64,128,256,512,1024',
-            'color' => 'required|string|max:50',
-            'condition' => 'required|in:new,like_new,good,fair',
-            'imei' => 'required|string|unique:listings,imei',
-            'description' => 'nullable|string|max:1000',
-            'asking_price' => 'required|integer|min:1000',
-            'retail_price' => 'nullable|integer',
-            'accepts_trade' => 'boolean',
-            'sale_type' => 'required|in:marketplace,quick_sale',
-            'photos' => 'required|array|min:6',
-            'photos.*' => 'url',
+            'iphone_model'    => 'required|string|max:100',
+            'capacity'        => 'required|in:64,128,256,512,1024',
+            'color'           => 'required|string|max:50',
+            'condition'       => 'required|in:new,like_new,good,fair',
+            'imei'            => 'required|string|unique:listings,imei',
+            'description'     => 'nullable|string|max:1000',
+            'asking_price'    => 'required|integer|min:1000',
+            'whatsapp_number' => 'required|string|max:20',
+            'plan'            => 'required|in:basic,verified_phone,verified_seller',
+            'is_boosted'      => 'boolean',
+            'photos'          => 'required|array|min:1',
+            'photos.*'        => 'url',
         ]);
 
-        $aiResult = $this->aiService->suggestPrice(
-            $request->iphone_model,
-            $request->condition,
-            (int) $request->capacity,
-        );
+        // Pour vendeur vérifié, KYC obligatoire
+        if ($request->plan === 'verified_seller') {
+            $kyc = $request->user()->kyc;
+            if (!$kyc || $kyc->status !== 'approved') {
+                return response()->json([
+                    'message' => 'Le badge "Vendeur vérifié" nécessite un KYC approuvé. Vérifiez votre identité d\'abord.',
+                ], 422);
+            }
+        }
+
+        // Utiliser un crédit si disponible
+        $seller = $request->user();
+        $usedCredit = false;
+
+        if ($seller->listing_credits > 0) {
+            $seller->decrement('listing_credits');
+            $usedCredit = true;
+        }
 
         $listing = Listing::create([
-            ...$request->only([
-                'iphone_model', 'capacity', 'color', 'condition',
-                'imei', 'description', 'asking_price', 'retail_price',
-                'accepts_trade', 'sale_type',
-            ]),
-            'seller_id' => $request->user()->id,
-            'ai_suggested_price' => $aiResult['suggested_price'] ?? null,
-            'retail_price' => $request->retail_price ?? ($aiResult['retail_price'] ?? null),
-            'status' => 'pending_expertise',
+            'seller_id'       => $seller->id,
+            'iphone_model'    => $request->iphone_model,
+            'capacity'        => $request->capacity,
+            'color'           => $request->color,
+            'condition'       => $request->condition,
+            'imei'            => $request->imei,
+            'description'     => $request->description,
+            'asking_price'    => $request->asking_price,
+            'whatsapp_number' => $request->whatsapp_number,
+            'plan'            => $request->plan,
+            'is_boosted'      => $request->boolean('is_boosted'),
+            'sale_type'       => 'marketplace',
+            'accepts_trade'   => false,
+            'payment_status'  => $usedCredit ? 'paid' : 'pending_payment',
+            'status'          => $usedCredit ? ($request->plan === 'basic' ? 'published' : 'pending_expertise') : 'draft',
+            'expires_at'      => $usedCredit ? now()->addDays(30) : null,
         ]);
 
         foreach ($request->photos as $index => $url) {
             ListingPhoto::create([
                 'listing_id' => $listing->id,
-                'url' => $url,
-                'type' => 'seller',
-                'order' => $index,
+                'url'        => $url,
+                'type'       => 'seller',
+                'order'      => $index,
             ]);
         }
 
-        // Notifier le vendeur avec les infos de l'expert partenaire disponible
-        $expertProfile = ExpertProfile::where('is_active', true)->inRandomOrder()->first();
-        app(NotificationService::class)->listingSubmitted(
-            $request->user(),
-            "{$listing->iphone_model} {$listing->capacity}Go",
-            $expertProfile?->partner_name,
-            $expertProfile ? "{$expertProfile->address}, {$expertProfile->city}" : null,
-            $expertProfile?->appointment_info
-        );
+        if ($usedCredit) {
+            return response()->json([
+                'message'     => 'Annonce publiée avec votre crédit.',
+                'listing'     => $listing->load('photos'),
+                'used_credit' => true,
+            ], 201);
+        }
+
+        // Générer le lien de paiement
+        $frontUrl  = config('app.frontend_url', 'https://trokly-web.onrender.com');
+        $returnUrl = "{$frontUrl}/listings/payment/success?listing_id={$listing->id}";
+        $cancelUrl = "{$frontUrl}/listings/payment/cancel?listing_id={$listing->id}";
+
+        $paymentData = app(PaymentService::class)->createPaymentLink($listing, $returnUrl, $cancelUrl);
 
         return response()->json([
-            'message' => 'Annonce soumise pour expertise.',
-            'listing' => $listing->load('photos'),
-            'ai_suggestion' => $aiResult ? [
-                'suggested_price' => $aiResult['suggested_price'],
-                'price_range' => $aiResult['price_range'],
-            ] : null,
+            'message'     => 'Annonce créée. Procédez au paiement.',
+            'listing'     => $listing->load('photos'),
+            'payment_url' => $paymentData['payment_url'],
+            'amount'      => $paymentData['amount'],
+            'used_credit' => false,
         ], 201);
+    }
+
+    public function markSold(Request $request, Listing $listing): JsonResponse
+    {
+        if ($listing->seller_id !== $request->user()->id) {
+            return response()->json(['message' => 'Non autorisé.'], 403);
+        }
+
+        if ($listing->status !== 'published') {
+            return response()->json(['message' => 'Seules les annonces publiées peuvent être marquées vendues.'], 422);
+        }
+
+        $listing->update(['status' => 'sold', 'sold_at' => now()]);
+
+        return response()->json(['message' => 'Annonce marquée comme vendue.']);
     }
 
     public function update(Request $request, Listing $listing): JsonResponse
@@ -144,17 +179,14 @@ class ListingController extends Controller
         }
 
         $request->validate([
-            'description' => 'nullable|string|max:1000',
-            'asking_price' => 'sometimes|integer|min:1000',
-            'accepts_trade' => 'sometimes|boolean',
+            'description'     => 'nullable|string|max:1000',
+            'asking_price'    => 'sometimes|integer|min:1000',
+            'whatsapp_number' => 'sometimes|string|max:20',
         ]);
 
-        $listing->update($request->only(['description', 'asking_price', 'accepts_trade']));
+        $listing->update($request->only(['description', 'asking_price', 'whatsapp_number']));
 
-        return response()->json([
-            'message' => 'Annonce mise à jour.',
-            'listing' => $listing,
-        ]);
+        return response()->json(['message' => 'Annonce mise à jour.', 'listing' => $listing]);
     }
 
     public function destroy(Request $request, Listing $listing): JsonResponse
@@ -180,5 +212,41 @@ class ListingController extends Controller
             ->paginate(20);
 
         return response()->json($listings);
+    }
+
+    public function sellerProfile(Request $request, int $sellerId): JsonResponse
+    {
+        $seller = \App\Models\User::findOrFail($sellerId);
+
+        $listings = Listing::with(['photos' => fn($q) => $q->where('type', 'seller')->limit(1)])
+            ->where('seller_id', $sellerId)
+            ->where('status', 'published')
+            ->where('payment_status', 'paid')
+            ->where(fn($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->orderBy('is_boosted', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $salesTotal = Listing::where('seller_id', $sellerId)->where('status', 'sold')->count();
+        $sales6m    = Listing::where('seller_id', $sellerId)->where('status', 'sold')
+            ->where('sold_at', '>=', now()->subMonths(6))->count();
+
+        $kyc = $seller->kyc;
+
+        return response()->json([
+            'seller' => [
+                'id'              => $seller->id,
+                'full_name'       => $seller->full_name,
+                'member_since'    => $seller->created_at,
+                'is_kyc_verified' => $kyc && $kyc->status === 'approved',
+                'listing_credits' => $seller->listing_credits,
+            ],
+            'stats' => [
+                'active_listings'    => $listings->count(),
+                'total_sales'        => $salesTotal,
+                'sales_last_6months' => $sales6m,
+            ],
+            'listings' => $listings,
+        ]);
     }
 }

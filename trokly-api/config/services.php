@@ -46,8 +46,8 @@ return [
     ],
 
     'payplus' => [
-        'api_key' => env('PAYPLUS_API_KEY'),
-        'secret_key' => env('PAYPLUS_SECRET_KEY'),
+        'api_key'  => env('PAYPLUS_API_KEY'),
+        'token'    => env('PAYPLUS_TOKEN'),
         'base_url' => env('PAYPLUS_BASE_URL', 'https://api.payplus.africa'),
     ],
 

@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\WalletController;
 use App\Http\Controllers\Api\KycController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\BoostController;
+use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\Admin\AdminListingController;
 use App\Http\Controllers\Api\Admin\AdminExpertiseController;
 use App\Http\Controllers\Api\Admin\AdminTransactionController;
@@ -37,6 +38,10 @@ Route::prefix('auth')->group(function () {
 // Routes publiques (marketplace consultable sans compte)
 Route::get('listings', [ListingController::class, 'index']);
 Route::get('listings/{listing}', [ListingController::class, 'show']);
+Route::get('sellers/{sellerId}', [ListingController::class, 'sellerProfile']);
+
+// Webhook PayPlus (public, appelé par PayPlus)
+Route::post('payments/webhook', [PaymentController::class, 'webhook']);
 
 // Routes authentifiées
 Route::middleware('auth:sanctum')->group(function () {
@@ -52,7 +57,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('listings', [ListingController::class, 'store']);
     Route::put('listings/{listing}', [ListingController::class, 'update']);
     Route::delete('listings/{listing}', [ListingController::class, 'destroy']);
+    Route::post('listings/{listing}/mark-sold', [ListingController::class, 'markSold']);
     Route::post('listings/{listing}/boost', [BoostController::class, 'store']);
+
+    // Paiement annonces
+    Route::post('payments/{listing}/initiate', [PaymentController::class, 'initiate']);
+    Route::get('payments/verify', [PaymentController::class, 'verify']);
 
     // Mes annonces
     Route::get('my/listings', [ListingController::class, 'myListings']);

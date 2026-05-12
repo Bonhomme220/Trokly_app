@@ -164,13 +164,16 @@ class AdminExpertiseController extends Controller
         $listing = $expertise->listing;
         $listing->update(['status' => 'rejected']);
 
+        // Crédit pour republier
+        $listing->seller->increment('listing_credits');
+
         app(NotificationService::class)->listingRejected(
             $listing->seller,
             "{$listing->iphone_model} {$listing->capacity}Go",
             $request->reason
         );
 
-        return response()->json(['message' => 'Expertise rejetée. Vendeur notifié.']);
+        return response()->json(['message' => 'Expertise rejetée. Crédit de republication accordé au vendeur.']);
     }
 
     public function quickSaleDecide(Request $request, Listing $listing): JsonResponse

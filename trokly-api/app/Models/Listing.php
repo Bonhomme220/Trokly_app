@@ -22,6 +22,13 @@ class Listing extends Model
         'retail_price',
         'accepts_trade',
         'sale_type',
+        'plan',
+        'is_boosted',
+        'whatsapp_number',
+        'expires_at',
+        'payment_status',
+        'payment_reference',
+        'sold_at',
         'quality_grade',
         'status',
         'views_count',
@@ -30,11 +37,14 @@ class Listing extends Model
     protected function casts(): array
     {
         return [
-            'accepts_trade' => 'boolean',
-            'asking_price' => 'integer',
+            'accepts_trade'  => 'boolean',
+            'is_boosted'     => 'boolean',
+            'asking_price'   => 'integer',
             'ai_suggested_price' => 'integer',
-            'retail_price' => 'integer',
-            'views_count' => 'integer',
+            'retail_price'   => 'integer',
+            'views_count'    => 'integer',
+            'expires_at'     => 'datetime',
+            'sold_at'        => 'datetime',
         ];
     }
 
