@@ -52,7 +52,7 @@ export default function Footer() {
               { label: "Mon dashboard", href: "/seller" },
               { label: "Vérification KYC", href: "/kyc" },
               { label: "Retrait MoMo", href: "/wallet/withdraw" },
-              { label: "Comment ça marche", href: "#" },
+              { label: "Comment ça marche", href: "/comment-ca-marche" },
             ].map(({ label, href }) => (
               <li key={label}>
                 <Link href={href} className="text-sm transition-colors hover:text-white" style={{ color: "rgba(247,245,240,0.5)" }}>
@@ -71,11 +71,11 @@ export default function Footer() {
           <ul className="space-y-3">
             <li className="flex items-center gap-2 text-sm" style={{ color: "rgba(247,245,240,0.5)" }}>
               <Phone size={13} style={{ flexShrink: 0, color: "#00D084" }} />
-              +229 97 00 00 00
+              01 96 17 13 00
             </li>
             <li className="flex items-center gap-2 text-sm" style={{ color: "rgba(247,245,240,0.5)" }}>
               <Mail size={13} style={{ flexShrink: 0, color: "#00D084" }} />
-              hello@trokly.com
+              contact@trokly.bj
             </li>
             <li className="flex items-center gap-2 text-sm" style={{ color: "rgba(247,245,240,0.5)" }}>
               <MapPin size={13} style={{ flexShrink: 0, color: "#00D084" }} />
@@ -108,8 +108,13 @@ export default function Footer() {
             © {new Date().getFullYear()} Trokly · Tous droits réservés · Cotonou, Bénin
           </p>
           <div className="flex items-center gap-6">
-            {["Confidentialité", "CGU", "Mentions légales"].map((label) => (
-              <Link key={label} href="#" className="text-xs transition-colors hover:text-white" style={{ color: "rgba(247,245,240,0.25)" }}>
+            {[
+              { label: "Confidentialité", href: "/confidentialite" },
+              { label: "CGU", href: "/cgu" },
+              { label: "Mentions légales", href: "/mentions-legales" },
+              { label: "Contact", href: "/contact" },
+            ].map(({ label, href }) => (
+              <Link key={label} href={href} className="text-xs transition-colors hover:text-white" style={{ color: "rgba(247,245,240,0.25)" }}>
                 {label}
               </Link>
             ))}
