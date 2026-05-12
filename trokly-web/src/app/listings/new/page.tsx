@@ -216,7 +216,7 @@ export default function NewListingPage() {
             <p className="text-xl font-black" style={{ color: "#0B1A2B" }}>{totalPrice.toLocaleString()} FCFA</p>
           </div>
 
-          {user?.listing_credits > 0 && (
+          {(user?.listing_credits ?? 0) > 0 && (
             <div className="mt-3 p-3 rounded-xl text-xs font-medium" style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
               🎁 Vous avez {user.listing_credits} crédit(s) de republication — il sera utilisé automatiquement.
             </div>

@@ -16,7 +16,7 @@ export interface User {
   email?: string;
   is_active: boolean;
   roles: string[];
-  listing_credits: number;
+  listing_credits?: number;
   kyc?: Kyc;
   wallet?: Wallet;
   created_at: string;
