@@ -35,13 +35,22 @@ class PaymentController extends Controller
     // Webhook appelé par PayPlus après paiement
     public function webhook(Request $request): JsonResponse
     {
-        $transId = $request->input('transId') ?? $request->input('requestId');
+        // PayPlus envoie le token de la facture
+        $invoiceToken = $request->input('token');
 
-        if (!$transId) {
-            return response()->json(['message' => 'Missing transId.'], 400);
+        if (!$invoiceToken) {
+            return response()->json(['message' => 'Missing token.'], 400);
         }
 
-        $listing = Listing::where('payment_reference', $transId)->first();
+        $listing = Listing::where('payment_reference', $invoiceToken)->first();
+
+        if (!$listing) {
+            // Chercher via custom_data listing_id si disponible
+            $listingId = $request->input('customdata.listing_id') ?? $request->input('custom_data.listing_id');
+            if ($listingId) {
+                $listing = Listing::find($listingId);
+            }
+        }
 
         if (!$listing) {
             return response()->json(['message' => 'Listing not found.'], 404);
@@ -51,10 +60,11 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Already processed.']);
         }
 
-        $status = $request->input('status') ?? $request->input('data.status');
+        // Vérifier le statut : "completed" = validé, "pending" = en attente, "notcompleted" = annulé
+        $status = $request->input('description') ?? '';
 
-        if (!in_array($status, ['COMPLETED', 'SUCCESS', 'success', 'completed'])) {
-            return response()->json(['message' => 'Payment not completed.'], 422);
+        if ($status !== 'completed') {
+            return response()->json(['message' => 'Payment not completed yet.'], 422);
         }
 
         $this->confirmPayment($listing);

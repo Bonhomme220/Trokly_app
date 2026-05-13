@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Listing;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class PaymentService
 {
@@ -24,67 +23,87 @@ class PaymentService
 
     public function createPaymentLink(Listing $listing, string $returnUrl, string $cancelUrl): array
     {
-        $amount    = self::totalPrice($listing->plan, $listing->is_boosted);
-        $transId   = 'TRK-' . $listing->id . '-' . Str::random(8);
-        $callbackUrl = config('app.url') . '/api/payments/webhook';
+        $amount      = self::totalPrice($listing->plan, $listing->is_boosted);
+        $callbackUrl = rtrim(config('app.url'), '/') . '/api/payments/webhook';
+        $frontUrl    = rtrim(config('app.frontend_url', 'https://trokly-web.onrender.com'), '/');
 
-        $description = match ($listing->plan) {
-            'basic'           => 'Annonce simple Trokly',
-            'verified_phone'  => 'Annonce vérifiée Trokly',
-            'verified_seller' => 'Annonce vendeur vérifié Trokly',
+        $planLabel = match ($listing->plan) {
+            'basic'           => 'Annonce simple',
+            'verified_phone'  => 'Annonce vérifiée',
+            'verified_seller' => 'Annonce vendeur vérifié',
         };
 
-        if ($listing->is_boosted) {
-            $description .= ' + TOP annonces';
-        }
+        $description = $planLabel . ($listing->is_boosted ? ' + TOP annonces' : '');
+
+        $payload = [
+            'commande' => [
+                'invoice' => [
+                    'items' => [
+                        [
+                            'name'        => $description,
+                            'description' => "{$listing->iphone_model} {$listing->capacity}Go",
+                            'quantity'    => 1,
+                            'unit_price'  => $amount,
+                            'total_price' => $amount,
+                        ],
+                    ],
+                    'total_amount' => $amount,
+                    'devise'       => 'xof',
+                    'description'  => "Trokly — {$description}",
+                ],
+                'store' => [
+                    'name'        => 'Trokly',
+                    'website_url' => $frontUrl,
+                ],
+                'actions' => [
+                    'cancel_url'   => $cancelUrl,
+                    'return_url'   => $returnUrl,
+                    'callback_url' => $callbackUrl,
+                ],
+                'custom_data' => [
+                    'listing_id' => (string) $listing->id,
+                ],
+            ],
+        ];
 
         $response = Http::withHeaders([
+            'Apikey'        => config('services.payplus.api_key'),
             'Authorization' => 'Bearer ' . config('services.payplus.token'),
+            'Accept'        => 'application/json',
             'Content-Type'  => 'application/json',
-        ])->post(config('services.payplus.base_url') . '/api/v1.1/Transaction/GetPaymentLink', [
-            'apiKey'      => config('services.payplus.api_key'),
-            'transId'     => $transId,
-            'requestId'   => $transId,
-            'amount'      => $amount,
-            'currency'    => 'XOF',
-            'description' => $description,
-            'returnUrl'   => $returnUrl,
-            'cancelUrl'   => $cancelUrl,
-            'callbackUrl' => $callbackUrl,
-            'data'        => ['listing_id' => $listing->id],
-        ]);
-
-        if (!$response->successful()) {
-            Log::error('PayPlus payment link failed: ' . $response->body());
-            throw new \RuntimeException('Impossible d\'initier le paiement.');
-        }
+        ])->post('https://app.payplus.africa/pay/v01/redirect/checkout-invoice/create', $payload);
 
         $data = $response->json();
 
-        $listing->update(['payment_reference' => $transId]);
+        if (!$response->successful() || ($data['response_code'] ?? '') !== '00') {
+            Log::error('PayPlus createPaymentLink failed', ['body' => $data]);
+            throw new \RuntimeException($data['description'] ?? 'Impossible d\'initier le paiement.');
+        }
+
+        $invoiceToken = $data['token'];
+
+        $listing->update(['payment_reference' => $invoiceToken]);
 
         return [
-            'payment_url'   => $data['data']['payment_url'] ?? $data['payment_url'],
-            'reference'     => $transId,
-            'amount'        => $amount,
+            'payment_url' => $data['response_text'],
+            'token'       => $invoiceToken,
+            'amount'      => $amount,
         ];
     }
 
-    public function verifyPayment(string $reference): bool
+    public function verifyPayment(string $invoiceToken): bool
     {
         $response = Http::withHeaders([
+            'Apikey'        => config('services.payplus.api_key'),
             'Authorization' => 'Bearer ' . config('services.payplus.token'),
-            'Content-Type'  => 'application/json',
-        ])->post(config('services.payplus.base_url') . '/api/v1.1/Transaction/Check', [
-            'apiKey'  => config('services.payplus.api_key'),
-            'transId' => $reference,
-        ]);
+        ])->post('https://app.payplus.africa/pay/v01/redirect/checkout-invoice/confirm/?invoiceToken=' . $invoiceToken);
 
-        if (!$response->successful()) {
+        $data = $response->json();
+
+        if (!$response->successful() || ($data['response_code'] ?? '') !== '00') {
             return false;
         }
 
-        $data = $response->json();
-        return ($data['data']['status'] ?? '') === 'COMPLETED';
+        return ($data['description'] ?? '') === 'completed';
     }
 }

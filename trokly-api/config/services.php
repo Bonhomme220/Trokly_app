@@ -46,9 +46,8 @@ return [
     ],
 
     'payplus' => [
-        'api_key'  => env('PAYPLUS_API_KEY'),
-        'token'    => env('PAYPLUS_TOKEN'),
-        'base_url' => env('PAYPLUS_BASE_URL', 'https://api.payplus.africa'),
+        'api_key' => env('PAYPLUS_API_KEY', 'BO0B8LRZAO7KPKEL2'),
+        'token'   => env('PAYPLUS_TOKEN', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpZF9hcHAiOiI0Nzg0IiwiaWRfYWJvbm5lIjoxMDc4MCwiZGF0ZWNyZWF0aW9uX2FwcCI6IjIwMjYtMDItMTYgMTI6MTg6MjMifQ.cCUYqc76pkEcJmvBROkmCmrJMJqqmMKRX8fQmOH44WY'),
     ],
 
 ];
