@@ -218,7 +218,7 @@ export default function NewListingPage() {
 
           {(user?.listing_credits ?? 0) > 0 && (
             <div className="mt-3 p-3 rounded-xl text-xs font-medium" style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
-              🎁 Vous avez {user.listing_credits} crédit(s) de republication — il sera utilisé automatiquement.
+              🎁 Vous avez {user?.listing_credits} crédit(s) de republication — il sera utilisé automatiquement.
             </div>
           )}
         </div>
