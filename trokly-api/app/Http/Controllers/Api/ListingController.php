@@ -50,7 +50,7 @@ class ListingController extends Controller
         $listing->load([
             'seller:id,full_name,listing_credits,created_at',
             'photos',
-            'expertise:id,listing_id,quality_grade,completed_at',
+            'expertise:id,listing_id,expert_id,quality_grade,checklist,notes,status,completed_at',
         ]);
 
         // Nombre de ventes sur 6 mois pour ce vendeur

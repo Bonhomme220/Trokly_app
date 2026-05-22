@@ -66,23 +66,21 @@ class NotificationService
 
     // ─── EXPERTISE ─────────────────────────────────────────────
 
-    public function listingSubmitted(User $seller, string $iphoneModel, ?string $expertName, ?string $expertAddress, ?string $appointmentInfo): void
+    public function listingSubmitted(User $seller, string $iphoneModel, ?string $sellerWhatsapp = null): void
     {
-        $expertInfo = $expertName
-            ? "<p>📍 <strong>Où apporter votre téléphone :</strong><br>
-               <strong>{$expertName}</strong><br>{$expertAddress}</p>
-               <p>{$appointmentInfo}</p>
-               <p>Présentez-vous avec votre iPhone et une pièce d'identité.</p>"
-            : "<p>Notre équipe vous contactera sous 24h pour organiser le dépôt de votre téléphone.</p>";
+        $contact = $sellerWhatsapp
+            ? "<p>📲 Notre expert vous contactera sur votre WhatsApp <strong>{$sellerWhatsapp}</strong> pour fixer un rendez-vous à votre convenance.</p>"
+            : "<p>📲 Notre expert vous contactera sur votre WhatsApp pour fixer un rendez-vous à votre convenance.</p>";
 
         $body = "<p>Bonjour <strong>{$seller->full_name}</strong>,</p>
-                 <p>Votre annonce pour le <strong>{$iphoneModel}</strong> a bien été reçue.</p>
-                 {$expertInfo}
-                 <p>La vérification se fait sur place. Vous repartez avec votre téléphone et l'expert valide ensuite pour publication.</p>";
+                 <p>Votre annonce pour le <strong>{$iphoneModel}</strong> a bien été reçue et est en attente de vérification.</p>
+                 {$contact}
+                 <p>✅ <strong>Pas besoin de vous déplacer</strong> — l'expert Trokly se déplace chez vous. La vérification prend environ 15 minutes. Une fois validé, votre annonce sera publiée automatiquement.</p>
+                 <p style='font-size:13px;color:#8A99AA'>Pensez à avoir votre iPhone chargé et prêt au moment de la visite.</p>";
 
         $this->send(
             $seller->email,
-            "📱 Votre annonce reçue — où apporter votre iPhone",
+            "📱 Votre annonce reçue — un expert Trokly vient chez vous",
             $this->template("Annonce bien reçue !", $body)
         );
     }

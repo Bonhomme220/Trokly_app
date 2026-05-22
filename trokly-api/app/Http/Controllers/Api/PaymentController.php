@@ -126,13 +126,10 @@ class PaymentController extends Controller
                 config('app.frontend_url', 'https://trokly-web.onrender.com') . "/listings/{$listing->id}"
             );
         } else {
-            $expertProfile = \App\Models\ExpertProfile::where('is_active', true)->inRandomOrder()->first();
             $notif->listingSubmitted(
                 $listing->seller,
                 "{$listing->iphone_model} {$listing->capacity}Go",
-                $expertProfile?->partner_name,
-                $expertProfile ? "{$expertProfile->address}, {$expertProfile->city}" : null,
-                $expertProfile?->appointment_info
+                $listing->whatsapp_number
             );
         }
     }

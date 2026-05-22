@@ -44,9 +44,10 @@ export interface Expertise {
   listing_id: number;
   expert_id?: number;
   quality_grade: string;
-  checklist: Record<string, boolean>;
+  /** Clés booléennes + clé spéciale "battery_health" (number 0-100) */
+  checklist: Record<string, boolean | number | string>;
   notes?: string;
-  status?: "pending" | "completed";
+  status?: "pending" | "validated" | "rejected";
   completed_at: string;
 }
 
