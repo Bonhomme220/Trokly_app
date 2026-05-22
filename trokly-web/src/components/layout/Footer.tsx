@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Shield, Truck, ArrowLeftRight, Phone, Mail, MapPin } from "lucide-react";
+import { Shield, MessageCircle, BadgeCheck, Phone, Mail, MapPin } from "lucide-react";
 
 export default function Footer() {
   return (
@@ -30,7 +30,7 @@ export default function Footer() {
               { label: "iPhone 16 Series", href: "/?model=iPhone+16+Pro" },
               { label: "iPhone 15 Series", href: "/?model=iPhone+15+Pro" },
               { label: "iPhone 14 Series", href: "/?model=iPhone+14+Pro" },
-              { label: "Annonces avec troc", href: "/?accepts_trade=1" },
+              { label: "Tarifs vendeurs", href: "/tarifs" },
             ].map(({ label, href }) => (
               <li key={label}>
                 <Link href={href} className="text-sm transition-colors hover:text-white" style={{ color: "rgba(247,245,240,0.5)" }}>
@@ -49,9 +49,9 @@ export default function Footer() {
           <ul className="space-y-3">
             {[
               { label: "Déposer un iPhone", href: "/listings/new" },
+              { label: "Nos tarifs", href: "/tarifs" },
               { label: "Mon dashboard", href: "/seller" },
               { label: "Vérification KYC", href: "/kyc" },
-              { label: "Retrait MoMo", href: "/wallet/withdraw" },
               { label: "Comment ça marche", href: "/comment-ca-marche" },
             ].map(({ label, href }) => (
               <li key={label}>
@@ -87,9 +87,9 @@ export default function Footer() {
             <p className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "rgba(247,245,240,0.3)" }}>Garanties</p>
             <div className="space-y-2">
               {[
-                { icon: Shield, label: "Expertisé Trokly" },
-                { icon: Truck, label: "Livraison 24–48h" },
-                { icon: ArrowLeftRight, label: "Troc accepté" },
+                { icon: Shield,        label: "Expertisé Trokly" },
+                { icon: MessageCircle, label: "Contact WhatsApp" },
+                { icon: BadgeCheck,    label: "Vendeurs vérifiés" },
               ].map(({ icon: Icon, label }) => (
                 <div key={label} className="flex items-center gap-2">
                   <Icon size={12} style={{ color: "#00D084", flexShrink: 0 }} />

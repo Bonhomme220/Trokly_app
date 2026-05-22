@@ -41,6 +41,13 @@ export default function Navbar() {
           >
             Marketplace
           </Link>
+          <Link
+            href="/tarifs"
+            className="px-4 py-2 rounded-full text-sm font-medium transition-colors hover:bg-black/5"
+            style={{ color: "#0B1A2B" }}
+          >
+            Tarifs
+          </Link>
 
           {isAuthenticated ? (
             <>
@@ -144,6 +151,14 @@ export default function Navbar() {
             onClick={() => setMenuOpen(false)}
           >
             Marketplace
+          </Link>
+          <Link
+            href="/tarifs"
+            className="px-3 py-2.5 rounded-xl text-sm font-medium"
+            style={{ color: "#0B1A2B" }}
+            onClick={() => setMenuOpen(false)}
+          >
+            Tarifs
           </Link>
 
           {isAuthenticated ? (
