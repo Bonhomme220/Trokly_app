@@ -5,12 +5,12 @@ import api from "@/lib/api";
 import { Listing, PaginatedResponse, Condition } from "@/lib/types";
 import ListingCard from "@/components/listings/ListingCard";
 import Button from "@/components/ui/Button";
+import Link from "next/link";
 import {
   Search, SlidersHorizontal, X, Shield, MessageCircle, BadgeCheck,
-  CheckCircle, Star, ChevronRight, Check, Bell
+  CheckCircle, Star, ChevronRight, Check,
 } from "lucide-react";
 import { CONDITION_LABELS, CONDITION_OPTIONS, formatPrice } from "@/lib/utils";
-import { useLeadModal } from "@/contexts/LeadContext";
 
 const MODEL_SERIES = [
   { label: "Tous", value: "" },
@@ -36,7 +36,6 @@ const TESTIMONIALS = [
 ];
 
 export default function HomePage() {
-  const { openLeadModal } = useLeadModal();
   const listingsRef = useRef<HTMLElement>(null);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,22 +111,6 @@ export default function HomePage() {
   return (
     <main className="flex-1">
 
-      {/* ═══ BANNIÈRE PRÉ-LANCEMENT ═══ */}
-      <div
-        className="w-full py-3 px-4 flex items-center justify-center gap-3 text-sm font-medium"
-        style={{ background: "#00D084", color: "#0B1A2B" }}
-      >
-        <Bell size={15} />
-        <span>Trokly arrive bientôt — Rejoignez la liste d'attente et soyez les premiers informés !</span>
-        <button
-          onClick={openLeadModal}
-          className="px-3 py-1 rounded-full text-xs font-bold transition-all"
-          style={{ background: "#0B1A2B", color: "#00D084" }}
-        >
-          Je m'inscris
-        </button>
-      </div>
-
       {/* ═══ HERO ═══ */}
       <section style={{ background: "#0B1A2B" }}>
         <div className="max-w-6xl mx-auto px-4 pt-16 pb-12">
@@ -177,13 +160,13 @@ export default function HomePage() {
               Voir les iPhones
               <ChevronRight size={16} />
             </button>
-            <button
+            <Link
+              href="/listings/new"
               className="btn btn-lg"
               style={{ background: "rgba(247,245,240,0.08)", color: "#F7F5F0", border: "1px solid rgba(247,245,240,0.12)" }}
-              onClick={openLeadModal}
             >
               Vendre le mien
-            </button>
+            </Link>
           </div>
 
           {/* Stats bar */}
@@ -493,10 +476,10 @@ export default function HomePage() {
               <p className="text-base mb-8 leading-relaxed" style={{ color: "rgba(247,245,240,0.5)" }}>
                 Déposez votre annonce en quelques minutes. Choisissez votre formule, payez en ligne, et votre annonce est publiée. Les acheteurs vous contactent directement sur WhatsApp.
               </p>
-              <button className="btn btn-primary btn-lg" onClick={openLeadModal}>
+              <Link href="/listings/new" className="btn btn-primary btn-lg">
                 Déposer mon iPhone
                 <ChevronRight size={16} />
-              </button>
+              </Link>
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -516,24 +499,24 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ WAITLIST CTA ═══ */}
+      {/* ═══ CTA FINAL ═══ */}
       <section style={{ background: "#00D084" }} className="py-16 px-4">
         <div className="max-w-2xl mx-auto text-center">
-          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "rgba(11,26,43,0.5)" }}>Pré-lancement</p>
+          <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: "rgba(11,26,43,0.5)" }}>Marketplace ouverte</p>
           <h2 className="text-3xl font-bold mb-3" style={{ color: "#0B1A2B", letterSpacing: "-0.02em" }}>
-            Trokly arrive bientôt au Bénin
+            Prêt à vendre votre iPhone ?
           </h2>
           <p className="mb-8 max-w-md mx-auto" style={{ color: "rgba(11,26,43,0.65)" }}>
-            Laissez votre numéro WhatsApp et soyez notifié en avant-première. Les premiers inscrits bénéficieront d'avantages exclusifs au lancement.
+            Déposez votre annonce en 5 minutes. Choisissez votre formule, payez en ligne — les acheteurs vous contactent directement sur WhatsApp.
           </p>
-          <button
+          <Link
+            href="/listings/new"
             className="btn btn-lg font-bold"
             style={{ background: "#0B1A2B", color: "#00D084" }}
-            onClick={openLeadModal}
           >
-            Rejoindre la liste d'attente
+            Déposer mon iPhone
             <ChevronRight size={16} />
-          </button>
+          </Link>
         </div>
       </section>
 

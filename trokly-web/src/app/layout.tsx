@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { LeadProvider } from "@/contexts/LeadContext";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 
@@ -53,11 +52,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col antialiased">
         <AuthProvider>
-          <LeadProvider>
-            <Navbar />
-            {children}
-            <Footer />
-          </LeadProvider>
+          <Navbar />
+          {children}
+          <Footer />
         </AuthProvider>
       </body>
     </html>
