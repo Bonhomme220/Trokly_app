@@ -28,9 +28,10 @@ class AuthController extends Controller
         }
 
         $user = User::create([
-            'email'          => $request->email,
-            'full_name'      => $request->full_name,
-            'email_verified' => true,
+            'email'           => $request->email,
+            'full_name'       => $request->full_name,
+            'email_verified'  => true,
+            'listing_credits' => 1,   // 1 crédit offert à l'inscription
         ]);
 
         $user->assignRole('buyer_seller');

@@ -147,4 +147,18 @@ class AdminUserController extends Controller
 
         return response()->json(['message' => 'KYC rejeté.']);
     }
+
+    public function giveCredits(Request $request, User $user): JsonResponse
+    {
+        $request->validate([
+            'credits' => 'required|integer|min:1|max:50',
+        ]);
+
+        $user->increment('listing_credits', $request->credits);
+
+        return response()->json([
+            'message'          => "{$request->credits} crédit(s) ajouté(s) à {$user->full_name}.",
+            'listing_credits'  => $user->fresh()->listing_credits,
+        ]);
+    }
 }

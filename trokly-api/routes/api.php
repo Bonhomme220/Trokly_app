@@ -105,6 +105,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('users/{user}/toggle-active', [AdminUserController::class, 'toggleActive']);
         Route::post('users/{user}/kyc/approve', [AdminUserController::class, 'approveKyc']);
         Route::post('users/{user}/kyc/reject', [AdminUserController::class, 'rejectKyc']);
+        Route::post('users/{user}/credits', [AdminUserController::class, 'giveCredits']);
 
         // Staff (super_admin seulement)
         Route::get('staff', [AdminUserController::class, 'staff'])->middleware('role:super_admin');

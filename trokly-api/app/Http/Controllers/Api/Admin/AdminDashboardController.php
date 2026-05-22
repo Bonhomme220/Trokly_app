@@ -123,6 +123,7 @@ class AdminDashboardController extends Controller
                 'active'         => $paid->where('status', 'published')->count(),
                 'sold'           => $paid->where('status', 'sold')->count(),
                 'total_spent'    => $totalSpent,
+                'listing_credits' => $user->listing_credits,
                 'plans' => [
                     'basic'           => $paid->where('plan', 'basic')->count(),
                     'verified_phone'  => $paid->where('plan', 'verified_phone')->count(),

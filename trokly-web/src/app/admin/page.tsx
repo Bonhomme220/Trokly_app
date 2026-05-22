@@ -12,7 +12,7 @@ import {
   LayoutDashboard, Package, Microscope, TrendingUp,
   CheckCircle, XCircle, ShoppingBag, Users, Clock,
   Ban, UserCheck, UserPlus, Shield, ListChecks, Phone, MapPin,
-  BadgeCheck, Zap, Euro,
+  BadgeCheck, Zap, Euro, Gift, X,
 } from "lucide-react";
 
 type Tab = "overview" | "revenue" | "listings" | "expertises" | "sellers" | "staff" | "leads";
@@ -45,6 +45,7 @@ interface AdminSeller {
   active: number;
   sold: number;
   total_spent: number;
+  listing_credits: number;
   plans: { basic: number; verified_phone: number; verified_seller: number };
 }
 
@@ -139,6 +140,10 @@ export default function AdminDashboard() {
   const [staffSuccess, setStaffSuccess] = useState("");
   const [dataLoading, setDataLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [creditModal, setCreditModal] = useState<{ id: number; full_name: string } | null>(null);
+  const [creditAmount, setCreditAmount] = useState(1);
+  const [creditLoading, setCreditLoading] = useState(false);
+  const [creditMsg, setCreditMsg] = useState("");
 
   const isSuperAdmin = user?.roles?.includes("super_admin");
   const isAdmin = user?.roles?.some(r => ["admin", "super_admin"].includes(r));
@@ -234,6 +239,23 @@ export default function AdminDashboard() {
         : err.response?.data?.message;
       setStaffError(msg || "Erreur lors de la création.");
     } finally { setStaffLoading(false); }
+  }
+
+  async function giveCredits() {
+    if (!creditModal) return;
+    setCreditLoading(true);
+    setCreditMsg("");
+    try {
+      const res = await api.post(`/admin/users/${creditModal.id}/credits`, { credits: creditAmount });
+      setCreditMsg(res.data.message);
+      setSellers(prev => prev.map(s =>
+        s.id === creditModal.id ? { ...s, listing_credits: res.data.listing_credits } : s
+      ));
+    } catch {
+      setCreditMsg("Erreur lors de l'ajout des crédits.");
+    } finally {
+      setCreditLoading(false);
+    }
   }
 
   async function toggleUserActive(id: number, active: boolean) {
@@ -603,7 +625,7 @@ export default function AdminDashboard() {
                           {formatPrice(s.total_spent)}
                         </p>
                         <p className="text-xs" style={{ color: "#8A99AA" }}>dépensés</p>
-                        <div className="flex items-center gap-2 justify-end mt-2">
+                        <div className="flex items-center gap-2 justify-end mt-1.5">
                           <span className="text-xs px-2 py-0.5 rounded-full font-medium"
                             style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
                             {s.active} en ligne
@@ -612,6 +634,22 @@ export default function AdminDashboard() {
                             style={{ background: "rgba(11,26,43,0.06)", color: "#0B1A2B" }}>
                             {s.sold} vendus
                           </span>
+                        </div>
+                        {/* Crédits + bouton */}
+                        <div className="flex items-center justify-end gap-2 mt-1.5">
+                          {s.listing_credits > 0 && (
+                            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold"
+                              style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
+                              <Gift size={10} /> {s.listing_credits} crédit{s.listing_credits > 1 ? "s" : ""}
+                            </span>
+                          )}
+                          <button
+                            className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-semibold transition-colors"
+                            style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}
+                            onClick={() => { setCreditModal({ id: s.id, full_name: s.full_name }); setCreditAmount(1); setCreditMsg(""); }}
+                          >
+                            <Gift size={11} /> Créditer
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -734,6 +772,68 @@ export default function AdminDashboard() {
             </div>
           )}
         </>
+      )}
+      {/* ── MODAL CRÉDIT ── */}
+      {creditModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(11,26,43,0.55)", backdropFilter: "blur(6px)" }}
+          onClick={e => e.target === e.currentTarget && setCreditModal(null)}
+        >
+          <div className="w-full max-w-sm rounded-2xl p-6 relative" style={{ background: "white", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+            <button
+              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(11,26,43,0.06)", color: "#0B1A2B" }}
+              onClick={() => setCreditModal(null)}
+            >
+              <X size={14} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(245,158,11,0.12)" }}>
+                <Gift size={18} style={{ color: "#F59E0B" }} />
+              </div>
+              <div>
+                <p className="font-bold" style={{ color: "#0B1A2B" }}>Donner des crédits</p>
+                <p className="text-sm" style={{ color: "#8A99AA" }}>{creditModal.full_name}</p>
+              </div>
+            </div>
+
+            <p className="text-sm mb-3" style={{ color: "#4A5568" }}>
+              Chaque crédit permet au vendeur de publier une annonce gratuitement (Basic ou vérifié).
+            </p>
+
+            <div className="flex items-center gap-3 mb-4">
+              <button
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold border-2 transition-all"
+                style={{ borderColor: "rgba(11,26,43,0.15)", color: "#0B1A2B" }}
+                onClick={() => setCreditAmount(Math.max(1, creditAmount - 1))}
+              >−</button>
+              <div className="flex-1 text-center">
+                <span className="text-4xl font-black font-mono" style={{ color: "#0B1A2B" }}>{creditAmount}</span>
+                <p className="text-xs mt-0.5" style={{ color: "#8A99AA" }}>crédit{creditAmount > 1 ? "s" : ""}</p>
+              </div>
+              <button
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold border-2 transition-all"
+                style={{ borderColor: "rgba(11,26,43,0.15)", color: "#0B1A2B" }}
+                onClick={() => setCreditAmount(Math.min(20, creditAmount + 1))}
+              >+</button>
+            </div>
+
+            {creditMsg && (
+              <p className="text-sm text-center mb-3 font-medium"
+                style={{ color: creditMsg.startsWith("Erreur") ? "#CC0000" : "#00B070" }}>
+                {creditMsg}
+              </p>
+            )}
+
+            <Button className="w-full" loading={creditLoading} onClick={giveCredits}>
+              <Gift size={14} />
+              Ajouter {creditAmount} crédit{creditAmount > 1 ? "s" : ""}
+            </Button>
+          </div>
+        </div>
       )}
     </main>
   );
