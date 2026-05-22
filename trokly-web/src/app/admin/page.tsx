@@ -4,17 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
-import { Listing, Transaction, Litigation, User } from "@/lib/types";
+import { Listing, User } from "@/lib/types";
 import { formatDate, formatPrice, CONDITION_LABELS } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import {
-  LayoutDashboard, Package, Microscope, CreditCard,
-  CheckCircle, XCircle, TrendingUp, ShoppingBag, Users, Clock,
-  AlertTriangle, Ban, UserCheck, UserPlus, Shield, ListChecks, Phone, MapPin
+  LayoutDashboard, Package, Microscope,
+  CheckCircle, XCircle, ShoppingBag, Users, Clock,
+  Ban, UserCheck, UserPlus, Shield, ListChecks, Phone, MapPin
 } from "lucide-react";
 
-type Tab = "overview" | "listings" | "expertises" | "transactions" | "users" | "litigations" | "staff" | "leads";
+type Tab = "overview" | "listings" | "expertises" | "users" | "staff" | "leads";
 
 interface DashboardStats {
   total_listings: number;
@@ -35,7 +35,6 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [listings, setListings] = useState<AdminListing[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [leads, setLeads] = useState<{ id: number; full_name: string; phone_number: string; profile: string; city: string; has_iphone_to_sell: boolean; created_at: string }[]>([]);
   const [staffList, setStaffList] = useState<User[]>([]);
@@ -43,7 +42,6 @@ export default function AdminDashboard() {
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
   const [staffSuccess, setStaffSuccess] = useState("");
-  const [litigations, setLitigations] = useState<Litigation[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
@@ -66,28 +64,20 @@ export default function AdminDashboard() {
     setDataLoading(true);
     try {
       if (tab === "overview") {
-        const [lstRes, txRes] = await Promise.all([
-          api.get("/admin/listings?per_page=100"),
-          api.get("/admin/transactions?per_page=100").catch(() => ({ data: { data: [] } })),
-        ]);
-        const allListings: AdminListing[] = lstRes.data.data || [];
-        const allTx: Transaction[] = txRes.data.data || [];
+        const res = await api.get("/admin/listings?per_page=100");
+        const allListings: AdminListing[] = res.data.data || [];
         setListings(allListings);
-        setTransactions(allTx);
         setStats({
           total_listings: allListings.length,
           pending_expertise: allListings.filter((l) => l.status === "pending_expertise").length,
           published: allListings.filter((l) => l.status === "published").length,
-          total_transactions: allTx.length,
-          pending_transactions: allTx.filter((t) => t.status === "pending").length,
-          total_revenue: allTx.filter((t) => t.status === "completed").reduce((s, t) => s + t.commission, 0),
+          total_transactions: 0,
+          pending_transactions: 0,
+          total_revenue: 0,
         });
       } else if (tab === "listings" || tab === "expertises") {
         const res = await api.get("/admin/listings?per_page=100");
         setListings(res.data.data || []);
-      } else if (tab === "transactions") {
-        const res = await api.get("/admin/transactions?per_page=100").catch(() => ({ data: { data: [] } }));
-        setTransactions(res.data.data || []);
       } else if (tab === "users") {
         const res = await api.get("/admin/users?per_page=100").catch(() => ({ data: { data: [] } }));
         setUsers(res.data.data || res.data || []);
@@ -97,9 +87,6 @@ export default function AdminDashboard() {
       } else if (tab === "leads") {
         const res = await api.get("/leads").catch(() => ({ data: { data: [] } }));
         setLeads(res.data.data || []);
-      } else if (tab === "litigations") {
-        const res = await api.get("/admin/litigations?per_page=100").catch(() => ({ data: { data: [] } }));
-        setLitigations(res.data.data || res.data || []);
       }
     } finally {
       setDataLoading(false);
@@ -121,26 +108,6 @@ export default function AdminDashboard() {
     try {
       await api.post(`/admin/listings/${id}/reject`);
       setListings((prev) => prev.map((l) => l.id === id ? { ...l, status: "rejected" as const } : l));
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function releaseTransaction(id: number) {
-    setActionLoading(id);
-    try {
-      await api.post(`/admin/transactions/${id}/release`);
-      setTransactions((prev) => prev.map((t) => t.id === id ? { ...t, status: "completed" as const } : t));
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function resolveLitigation(id: number, resolution: "refund_buyer" | "release_seller") {
-    setActionLoading(id);
-    try {
-      await api.post(`/admin/litigations/${id}/resolve`, { resolution });
-      setLitigations(prev => prev.map(l => l.id === id ? { ...l, status: "resolved" as const, resolution } : l));
     } finally {
       setActionLoading(null);
     }
@@ -183,16 +150,11 @@ export default function AdminDashboard() {
 
   const pendingListings = listings.filter((l) => ["pending_expertise", "under_expertise"].includes(l.status));
   const expertiseQueue = listings.filter((l) => l.status === "pending_expertise");
-  const pendingTx = transactions.filter((t) => ["pending", "in_retraction"].includes(t.status));
-
-  const openLitigations = litigations.filter(l => l.status === "open");
 
   const TABS = [
     { key: "overview", label: "Vue d'ensemble", icon: LayoutDashboard },
     { key: "listings", label: "Annonces", icon: Package, badge: pendingListings.length },
     ...(isAdmin || isExpert ? [{ key: "expertises", label: "File expertise", icon: Microscope, badge: expertiseQueue.length }] : []),
-    ...(isAdmin ? [{ key: "transactions", label: "Transactions", icon: CreditCard, badge: pendingTx.length }] : []),
-    ...(isAdmin ? [{ key: "litigations", label: "Litiges", icon: AlertTriangle, badge: openLitigations.length }] : []),
     ...(isAdmin ? [{ key: "users", label: "Utilisateurs", icon: Users }] : []),
     ...(isSuperAdmin ? [{ key: "staff", label: "Équipe", icon: Shield }] : []),
     ...(isSuperAdmin ? [{ key: "leads", label: "Leads", icon: ListChecks }] : []),
@@ -256,21 +218,18 @@ export default function AdminDashboard() {
           {/* ── OVERVIEW ── */}
           {tab === "overview" && stats && (
             <div className="space-y-8">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {[
-                  { icon: Package, label: "Total annonces", value: stats.total_listings, color: "#0B1A2B" },
-                  { icon: Clock, label: "En attente expertise", value: stats.pending_expertise, color: "#B8860B" },
-                  { icon: ShoppingBag, label: "Publiées", value: stats.published, color: "#00B070" },
-                  { icon: CreditCard, label: "Transactions", value: stats.total_transactions, color: "#0B1A2B" },
-                  { icon: Clock, label: "En attente paiement", value: stats.pending_transactions, color: "#B8860B" },
-                  { icon: TrendingUp, label: "Commissions perçues", value: formatPrice(stats.total_revenue), color: "#00B070", big: true },
-                ].map(({ icon: Icon, label, value, color, big }) => (
+                  { icon: Package,   label: "Total annonces",      value: stats.total_listings,   color: "#0B1A2B" },
+                  { icon: Clock,     label: "En attente expertise", value: stats.pending_expertise, color: "#B8860B" },
+                  { icon: ShoppingBag, label: "Publiées",           value: stats.published,         color: "#00B070" },
+                ].map(({ icon: Icon, label, value, color }) => (
                   <div key={label} className="card p-5">
                     <div className="flex items-center gap-2 mb-3">
                       <Icon size={16} style={{ color: "#8A99AA" }} />
                       <p className="text-xs font-medium" style={{ color: "#8A99AA" }}>{label}</p>
                     </div>
-                    <p className={`font-bold ${big ? "text-xl" : "text-3xl"} font-mono`} style={{ color }}>
+                    <p className="font-bold text-3xl font-mono" style={{ color }}>
                       {value}
                     </p>
                   </div>
@@ -340,100 +299,6 @@ export default function AdminDashboard() {
                   </div>
                 ))
               )}
-            </div>
-          )}
-
-          {/* ── TRANSACTIONS ── */}
-          {tab === "transactions" && isAdmin && (
-            <div className="space-y-3">
-              {transactions.length === 0 ? (
-                <p className="text-center py-12 text-sm" style={{ color: "#8A99AA" }}>Aucune transaction.</p>
-              ) : (
-                transactions.map((tx) => (
-                  <div key={tx.id} className="card p-4 flex items-center gap-4">
-                    <div>
-                      <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>Transaction #{tx.id}</p>
-                      <p className="text-xs" style={{ color: "#8A99AA" }}>{formatDate(tx.created_at)}</p>
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold font-mono text-sm" style={{ color: "#0B1A2B" }}>{formatPrice(tx.amount)}</p>
-                      <p className="text-xs" style={{ color: "#8A99AA" }}>Commission : {formatPrice(tx.commission)}</p>
-                    </div>
-                    <Badge variant={
-                      tx.status === "completed" ? "signal" :
-                      tx.status === "pending" || tx.status === "in_retraction" ? "warning" : "error"
-                    }>
-                      {tx.status === "completed" ? "Complétée" :
-                       tx.status === "pending" ? "En attente" :
-                       tx.status === "in_retraction" ? "Rétractation" : tx.status}
-                    </Badge>
-                    {tx.status === "in_retraction" && (
-                      <Button size="sm" onClick={() => releaseTransaction(tx.id)} loading={actionLoading === tx.id}>
-                        Libérer
-                      </Button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {/* ── LITIGATIONS ── */}
-          {tab === "litigations" && isAdmin && (
-            <div className="space-y-3">
-              {litigations.length === 0 ? (
-                <div className="text-center py-16">
-                  <CheckCircle size={36} className="mx-auto mb-3 opacity-20" style={{ color: "#0B1A2B" }} />
-                  <p className="font-semibold" style={{ color: "#0B1A2B" }}>Aucun litige</p>
-                </div>
-              ) : litigations.map(lit => (
-                <div key={lit.id} className="card p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: lit.status === "open" ? "rgba(204,0,0,0.1)" : "rgba(0,208,132,0.1)" }}>
-                        <AlertTriangle size={15} style={{ color: lit.status === "open" ? "#CC0000" : "#00D084" }} />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>
-                          Litige #{lit.id} — Transaction #{lit.transaction_id}
-                        </p>
-                        <p className="text-xs mt-0.5" style={{ color: "#8A99AA" }}>{lit.reason}</p>
-                        <p className="text-xs mt-0.5" style={{ color: "#8A99AA" }}>{formatDate(lit.created_at)}</p>
-                      </div>
-                    </div>
-                    <Badge variant={lit.status === "open" ? "error" : "signal"}>
-                      {lit.status === "open" ? "Ouvert" : "Résolu"}
-                    </Badge>
-                  </div>
-                  {lit.status === "open" && (
-                    <div className="flex gap-2 mt-3 pt-3" style={{ borderTop: "1px solid rgba(11,26,43,0.08)" }}>
-                      <Button
-                        size="sm"
-                        className="flex-1"
-                        loading={actionLoading === lit.id}
-                        onClick={() => resolveLitigation(lit.id, "refund_buyer")}
-                        style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" } as React.CSSProperties}
-                      >
-                        <CheckCircle size={13} /> Rembourser l'acheteur
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="flex-1"
-                        loading={actionLoading === lit.id}
-                        onClick={() => resolveLitigation(lit.id, "release_seller")}
-                        style={{ background: "rgba(11,26,43,0.06)", color: "#0B1A2B" } as React.CSSProperties}
-                      >
-                        <UserCheck size={13} /> Libérer au vendeur
-                      </Button>
-                    </div>
-                  )}
-                  {lit.status === "resolved" && lit.resolution && (
-                    <p className="text-xs mt-2 font-medium" style={{ color: "#00B070" }}>
-                      Résolution : {lit.resolution === "refund_buyer" ? "Acheteur remboursé" : "Paiement libéré au vendeur"}
-                    </p>
-                  )}
-                </div>
-              ))}
             </div>
           )}
 
@@ -525,7 +390,6 @@ export default function AdminDashboard() {
                     onChange={e => setStaffForm(f => ({ ...f, role: e.target.value }))}
                   >
                     <option value="expert">Expert</option>
-                    <option value="delivery_agent">Livreur</option>
                     <option value="admin">Administrateur</option>
                   </select>
                   {staffError && <p className="text-xs" style={{ color: "#CC0000" }}>{staffError}</p>}

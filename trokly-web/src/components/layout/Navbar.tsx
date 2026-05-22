@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { Bell, LogOut, Menu, X, ArrowLeftRight, LayoutDashboard, Truck, Microscope } from "lucide-react";
+import { Bell, LogOut, Menu, X, LayoutDashboard, Truck, Microscope } from "lucide-react";
 import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { useLeadModal } from "@/contexts/LeadContext";
@@ -83,14 +83,6 @@ export default function Navbar() {
                 Dashboard
               </Link>
               <Link
-                href="/trades"
-                className="px-4 py-2 rounded-full text-sm font-medium transition-colors hover:bg-black/5 flex items-center gap-1.5"
-                style={{ color: "#0B1A2B" }}
-              >
-                <ArrowLeftRight size={14} />
-                Trocs
-              </Link>
-              <Link
                 href="/notifications"
                 className="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-black/5"
                 style={{ color: "#0B1A2B" }}
@@ -100,7 +92,7 @@ export default function Navbar() {
 
               {/* Avatar menu */}
               <Link
-                href="/profile"
+                href="/seller"
                 className="flex items-center gap-2.5 ml-1 px-3 py-1.5 rounded-full transition-colors hover:bg-black/5"
                 style={{ color: "#0B1A2B" }}
               >
@@ -173,9 +165,6 @@ export default function Navbar() {
               )}
               <Link href={dashboardHref} className="px-3 py-2.5 rounded-xl text-sm font-medium" style={{ color: "#0B1A2B" }} onClick={() => setMenuOpen(false)}>
                 Mon dashboard
-              </Link>
-              <Link href="/trades" className="px-3 py-2.5 rounded-xl text-sm font-medium" style={{ color: "#0B1A2B" }} onClick={() => setMenuOpen(false)}>
-                Mes trocs
               </Link>
               <div className="divider my-1" />
               <button
