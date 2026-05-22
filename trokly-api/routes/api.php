@@ -96,6 +96,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Admin
     Route::prefix('admin')->middleware('role:admin|super_admin')->group(function () {
         Route::get('dashboard', [AdminDashboardController::class, 'index']);
+        Route::get('stats', [AdminDashboardController::class, 'stats']);
+        Route::get('sellers', [AdminDashboardController::class, 'sellers']);
 
         // Utilisateurs
         Route::get('users', [AdminUserController::class, 'index']);

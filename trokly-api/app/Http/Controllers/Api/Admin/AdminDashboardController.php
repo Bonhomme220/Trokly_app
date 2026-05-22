@@ -4,36 +4,133 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Listing;
-use App\Models\Transaction;
 use App\Models\User;
-use App\Models\Litigation;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class AdminDashboardController extends Controller
 {
+    private const PLAN_PRICES = [
+        'basic'           => 499,
+        'verified_phone'  => 1499,
+        'verified_seller' => 2999,
+    ];
+
     public function index(): JsonResponse
     {
         return response()->json([
             'listings' => [
                 'pending_expertise' => Listing::where('status', 'pending_expertise')->count(),
-                'published' => Listing::where('status', 'published')->count(),
-                'total' => Listing::count(),
-            ],
-            'transactions' => [
-                'today' => Transaction::whereDate('created_at', today())->count(),
-                'in_escrow' => Transaction::where('status', 'in_escrow')->count(),
-                'revenue_month' => Transaction::whereMonth('created_at', now()->month)
-                    ->where('status', 'completed')
-                    ->sum('commission_amount'),
+                'published'         => Listing::where('status', 'published')->count(),
+                'total'             => Listing::count(),
             ],
             'users' => [
-                'total' => User::role('buyer_seller')->count(),
-                'new_today' => User::role('buyer_seller')->whereDate('created_at', today())->count(),
-            ],
-            'litigations' => [
-                'open' => Litigation::where('status', 'open')->count(),
-                'under_review' => Litigation::where('status', 'under_review')->count(),
+                'total'     => User::count(),
+                'new_today' => User::whereDate('created_at', today())->count(),
             ],
         ]);
+    }
+
+    public function stats(Request $request): JsonResponse
+    {
+        $days = min((int) $request->get('days', 30), 365);
+        $from = now()->subDays($days)->startOfDay();
+
+        // All paid listings (lightweight query)
+        $allPaid = Listing::where('payment_status', 'paid')
+            ->select('id', 'plan', 'is_boosted', 'status', 'seller_id', 'updated_at')
+            ->get();
+
+        // Period subset
+        $periodPaid = $allPaid->filter(fn($l) => $l->updated_at >= $from);
+
+        $calcRevenue = fn($col) => $col->sum(
+            fn($l) => (self::PLAN_PRICES[$l->plan] ?? 0) + ($l->is_boosted ? 500 : 0)
+        );
+
+        // Plan breakdown (all-time)
+        $plans = [];
+        foreach (self::PLAN_PRICES as $plan => $price) {
+            $count = $allPaid->where('plan', $plan)->count();
+            $plans[$plan] = ['count' => $count, 'revenue' => $count * $price];
+        }
+        $boostCount = $allPaid->where('is_boosted', true)->count();
+
+        // Daily chart data for the period
+        $chart = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = now()->subDays($i)->format('Y-m-d');
+            $dayItems = $periodPaid->filter(fn($l) => $l->updated_at->format('Y-m-d') === $date);
+            $chart[] = [
+                'date'     => $date,
+                'label'    => now()->subDays($i)->format('d/m'),
+                'revenue'  => (int) $calcRevenue($dayItems),
+                'listings' => $dayItems->count(),
+            ];
+        }
+
+        return response()->json([
+            'revenue' => [
+                'total'       => (int) $calcRevenue($allPaid),
+                'period'      => (int) $calcRevenue($periodPaid),
+                'period_days' => $days,
+            ],
+            'plans'  => $plans,
+            'boosts' => ['count' => $boostCount, 'revenue' => $boostCount * 500],
+            'listings' => [
+                'total'             => Listing::count(),
+                'paid'              => $allPaid->count(),
+                'published'         => Listing::where('status', 'published')->count(),
+                'pending_expertise' => Listing::where('status', 'pending_expertise')->count(),
+                'sold'              => Listing::where('status', 'sold')->count(),
+                'draft'             => Listing::where('payment_status', 'pending_payment')->count(),
+            ],
+            'sellers' => [
+                'total'          => User::whereHas('listings', fn($q) => $q->where('payment_status', 'paid'))->count(),
+                'new_this_month' => User::whereMonth('created_at', now()->month)
+                    ->whereYear('created_at', now()->year)
+                    ->count(),
+            ],
+            'chart' => $chart,
+        ]);
+    }
+
+    public function sellers(Request $request): JsonResponse
+    {
+        $users = User::with([
+            'kyc:id,user_id,status',
+            'listings' => fn($q) => $q->where('payment_status', 'paid')
+                ->select('id', 'seller_id', 'plan', 'is_boosted', 'status'),
+        ])
+        ->withCount('listings as total_listings')
+        ->orderByDesc('created_at')
+        ->paginate(50);
+
+        $users->through(function ($user) {
+            $paid = $user->listings;
+            $totalSpent = $paid->sum(
+                fn($l) => (self::PLAN_PRICES[$l->plan] ?? 0) + ($l->is_boosted ? 500 : 0)
+            );
+
+            return [
+                'id'             => $user->id,
+                'full_name'      => $user->full_name,
+                'email'          => $user->email,
+                'created_at'     => $user->created_at,
+                'is_active'      => $user->is_active,
+                'kyc_status'     => $user->kyc?->status,
+                'listings_count' => $paid->count(),
+                'active'         => $paid->where('status', 'published')->count(),
+                'sold'           => $paid->where('status', 'sold')->count(),
+                'total_spent'    => $totalSpent,
+                'plans' => [
+                    'basic'           => $paid->where('plan', 'basic')->count(),
+                    'verified_phone'  => $paid->where('plan', 'verified_phone')->count(),
+                    'verified_seller' => $paid->where('plan', 'verified_seller')->count(),
+                ],
+            ];
+        });
+
+        return response()->json($users);
     }
 }
