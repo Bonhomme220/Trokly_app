@@ -6,8 +6,8 @@ import { Listing, PaginatedResponse, Condition } from "@/lib/types";
 import ListingCard from "@/components/listings/ListingCard";
 import Button from "@/components/ui/Button";
 import {
-  Search, SlidersHorizontal, X, Shield, ArrowLeftRight,
-  Truck, RotateCcw, Star, ChevronRight, Check, Bell
+  Search, SlidersHorizontal, X, Shield, MessageCircle, BadgeCheck,
+  CheckCircle, Star, ChevronRight, Check, Bell
 } from "lucide-react";
 import { CONDITION_LABELS, CONDITION_OPTIONS, formatPrice } from "@/lib/utils";
 import { useLeadModal } from "@/contexts/LeadContext";
@@ -30,9 +30,9 @@ const IPHONE_MODELS = [
 ];
 
 const TESTIMONIALS = [
-  { name: "Kossi A.", city: "Cotonou", text: "J'ai acheté un iPhone 14 Pro, expertisé grade A. Livré en 24h, exactement comme décrit. Je recommande !", stars: 5 },
-  { name: "Fatima D.", city: "Porto-Novo", text: "Super expérience de troc. J'ai échangé mon iPhone 12 contre un 14, avec soulte. L'équipe Trokly a tout géré.", stars: 5 },
-  { name: "Marc B.", city: "Cotonou", text: "Vendeur satisfait ! Mon iPhone 13 Pro vendu en 3 jours. Paiement sur MoMo direct, zéro prise de tête.", stars: 5 },
+  { name: "Kossi A.", city: "Cotonou", text: "J'ai acheté un iPhone 14 Pro avec le badge iPhone vérifié. Le vendeur a répondu en quelques minutes sur WhatsApp. Exactement comme décrit. Je recommande !", stars: 5 },
+  { name: "Fatima D.", city: "Porto-Novo", text: "Simple et rapide. J'ai trouvé un iPhone 14, contacté le vendeur sur WhatsApp, on s'est retrouvés le lendemain. Annonce avec badge vérifié, donc j'avais confiance.", stars: 5 },
+  { name: "Marc B.", city: "Cotonou", text: "Vendeur satisfait ! Mon iPhone 13 Pro vendu en 3 jours. Les acheteurs m'ont contacté directement sur WhatsApp. Zéro prise de tête.", stars: 5 },
 ];
 
 export default function HomePage() {
@@ -51,7 +51,6 @@ export default function HomePage() {
     condition: "" as Condition | "",
     capacity: "",
     max_price: "",
-    accepts_trade: false,
   });
 
   async function fetchListings(p = 1, replace = true, overrideModel?: string) {
@@ -63,7 +62,6 @@ export default function HomePage() {
       if (filters.condition) params.condition = filters.condition;
       if (filters.capacity) params.capacity = filters.capacity;
       if (filters.max_price) params.max_price = filters.max_price;
-      if (filters.accepts_trade) params.accepts_trade = "1";
 
       const res = await api.get<PaginatedResponse<Listing>>("/listings", { params });
       if (replace) setListings(res.data.data);
@@ -86,7 +84,7 @@ export default function HomePage() {
   }
 
   function resetFilters() {
-    setFilters({ model: "", condition: "", capacity: "", max_price: "", accepts_trade: false });
+    setFilters({ model: "", condition: "", capacity: "", max_price: "" });
     setActiveSeries("");
   }
 
@@ -99,7 +97,7 @@ export default function HomePage() {
   }
 
   const activeFilterCount = [
-    filters.model, filters.condition, filters.capacity, filters.max_price, filters.accepts_trade,
+    filters.model, filters.condition, filters.capacity, filters.max_price,
   ].filter(Boolean).length;
 
   const filteredBySearch = search.trim()
@@ -151,7 +149,7 @@ export default function HomePage() {
             <span style={{ color: "#00D084" }}>certifiés par Trokly.</span>
           </h1>
           <p className="text-center text-lg mb-8 max-w-xl mx-auto" style={{ color: "rgba(247,245,240,0.5)" }}>
-            Chaque téléphone est expertisé, photographié et garanti par notre équipe. Achetez en toute confiance ou vendez le vôtre.
+            Chaque téléphone est expertisé avant publication. Contactez le vendeur directement sur WhatsApp et achetez en toute confiance.
           </p>
 
           {/* Hero search bar */}
@@ -192,8 +190,8 @@ export default function HomePage() {
           <div className="grid grid-cols-3 max-w-lg mx-auto" style={{ borderTop: "1px solid rgba(247,245,240,0.08)", paddingTop: 24, gap: 0 }}>
             {[
               { value: "100%", label: "Expertisés" },
-              { value: "24–48h", label: "Livraison" },
-              { value: "Troc", label: "Accepté" },
+              { value: "WhatsApp", label: "Contact direct" },
+              { value: "Vérifié", label: "Par nos experts" },
             ].map((s, i) => (
               <div key={s.label} className="text-center" style={{ borderRight: i < 2 ? "1px solid rgba(247,245,240,0.08)" : "none" }}>
                 <p className="text-2xl font-bold font-mono" style={{ color: "#00D084" }}>{s.value}</p>
@@ -209,10 +207,10 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4">
             {[
-              { icon: Shield, title: "Expertisé Trokly", desc: "Contrôlé par notre équipe avant vente" },
-              { icon: Truck, title: "Livraison 24–48h", desc: "Remise en main propre à Cotonou" },
-              { icon: RotateCcw, title: "Retour 7 jours", desc: "Remboursement si problème constaté" },
-              { icon: ArrowLeftRight, title: "Troc avec soulte", desc: "Échangez votre iPhone facilement" },
+              { icon: Shield,       title: "Expertisé Trokly",     desc: "Contrôlé par un expert avant publication" },
+              { icon: MessageCircle, title: "Contact WhatsApp",      desc: "Discutez directement avec le vendeur" },
+              { icon: BadgeCheck,   title: "Vendeurs vérifiés",     desc: "KYC et badges de confiance disponibles" },
+              { icon: CheckCircle,  title: "iPhones certifiés",     desc: "Badge iPhone vérifié pour les plans premium" },
             ].map(({ icon: Icon, title, desc }, i) => (
               <div
                 key={title}
@@ -319,23 +317,11 @@ export default function HomePage() {
                   <input type="number" className="input text-sm" placeholder="Ex: 400 000" value={filters.max_price} onChange={(e) => setFilters({ ...filters, max_price: e.target.value })} />
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <div
-                    className="relative w-9 h-5 rounded-full transition-colors flex-shrink-0"
-                    style={{ background: filters.accepts_trade ? "#00D084" : "rgba(11,26,43,0.15)" }}
-                    onClick={() => setFilters({ ...filters, accepts_trade: !filters.accepts_trade })}
-                  >
-                    <div className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all" style={{ left: filters.accepts_trade ? 17 : 2 }} />
-                  </div>
-                  <span className="text-sm font-medium" style={{ color: "#0B1A2B" }}>Accepte le troc</span>
-                </label>
-                <div className="flex gap-2">
-                  <button className="text-sm flex items-center gap-1" style={{ color: "#8A99AA" }} onClick={resetFilters}>
-                    <X size={13} /> Réinitialiser
-                  </button>
-                  <Button size="sm" onClick={applyFilters}>Appliquer</Button>
-                </div>
+              <div className="flex items-center justify-end gap-2">
+                <button className="text-sm flex items-center gap-1" style={{ color: "#8A99AA" }} onClick={resetFilters}>
+                  <X size={13} /> Réinitialiser
+                </button>
+                <Button size="sm" onClick={applyFilters}>Appliquer</Button>
               </div>
             </div>
           )}
@@ -361,11 +347,6 @@ export default function HomePage() {
               {filters.max_price && (
                 <span className="badge badge-ink flex items-center gap-1">Max {parseInt(filters.max_price).toLocaleString("fr-FR")} FCFA
                   <button onClick={() => setFilters({ ...filters, max_price: "" })}><X size={11} /></button>
-                </span>
-              )}
-              {filters.accepts_trade && (
-                <span className="badge badge-signal flex items-center gap-1">Troc accepté
-                  <button onClick={() => setFilters({ ...filters, accepts_trade: false })}><X size={11} /></button>
                 </span>
               )}
             </div>
@@ -435,16 +416,16 @@ export default function HomePage() {
                 points: ["9 points de contrôle", "Grade qualité A à D", "Photos officielles Trokly"],
               },
               {
-                emoji: "🔒",
-                title: "Paiement sécurisé",
-                desc: "Le vendeur ne reçoit le paiement qu'après confirmation de livraison. Protection acheteur active à chaque transaction.",
-                points: ["Séquestre jusqu'à livraison", "Remboursement si problème", "Retrait MoMo instantané"],
+                emoji: "💬",
+                title: "Contact direct WhatsApp",
+                desc: "Pas d'intermédiaire pour payer. Vous trouvez le bon iPhone, vous contactez le vendeur directement sur WhatsApp et vous négociez.",
+                points: ["Numéro WhatsApp du vendeur", "Négociation directe", "Transaction entre particuliers"],
               },
               {
-                emoji: "🔄",
-                title: "Troc intelligent",
-                desc: "Proposez votre iPhone en échange d'un autre. Notre IA estime la soulte juste, et vous négociez directement.",
-                points: ["Estimation par IA", "Négociation en 3 rounds", "Soulte ou sans complément"],
+                emoji: "✅",
+                title: "Vendeurs de confiance",
+                desc: "Les vendeurs peuvent obtenir un badge Vendeur vérifié (KYC) ou iPhone vérifié (expertise physique) pour rassurer les acheteurs.",
+                points: ["KYC vérifié", "Badge Vendeur Vérifié", "Badge iPhone Vérifié"],
               },
             ].map(({ emoji, title, desc, points }) => (
               <div key={title} className="rounded-2xl p-7" style={{ background: "#F7F5F0", border: "1px solid rgba(11,26,43,0.07)" }}>
@@ -510,7 +491,7 @@ export default function HomePage() {
                 Vendez votre iPhone en toute sécurité
               </h2>
               <p className="text-base mb-8 leading-relaxed" style={{ color: "rgba(247,245,240,0.5)" }}>
-                Déposez votre annonce en 5 minutes. Notre équipe s'occupe de l'expertise, des photos et de la livraison. Vous encaissez sur MoMo, sans friction.
+                Déposez votre annonce en quelques minutes. Choisissez votre formule, payez en ligne, et votre annonce est publiée. Les acheteurs vous contactent directement sur WhatsApp.
               </p>
               <button className="btn btn-primary btn-lg" onClick={openLeadModal}>
                 Déposer mon iPhone
@@ -519,10 +500,10 @@ export default function HomePage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { step: "01", title: "Déposez", desc: "Remplissez le formulaire en 5 min" },
-                { step: "02", title: "Expertise", desc: "Notre équipe inspecte votre téléphone" },
+                { step: "01", title: "Déposez",     desc: "Remplissez le formulaire en 5 min" },
+                { step: "02", title: "Choisissez",  desc: "Sélectionnez votre formule (à partir de 499 FCFA)" },
                 { step: "03", title: "Publication", desc: "Votre annonce est mise en ligne" },
-                { step: "04", title: "Encaissement", desc: "Paiement MoMo à la livraison" },
+                { step: "04", title: "Vendez",      desc: "Les acheteurs vous contactent sur WhatsApp" },
               ].map(({ step, title, desc }) => (
                 <div key={step} className="rounded-2xl p-4" style={{ background: "rgba(247,245,240,0.05)", border: "1px solid rgba(247,245,240,0.08)" }}>
                   <p className="text-xs font-bold font-mono mb-2" style={{ color: "#00D084" }}>{step}</p>
@@ -552,27 +533,6 @@ export default function HomePage() {
           >
             Rejoindre la liste d'attente
             <ChevronRight size={16} />
-          </button>
-        </div>
-      </section>
-
-      {/* ═══ PROMO TROC ═══ */}
-      <section style={{ background: "white", borderTop: "1px solid rgba(11,26,43,0.07)" }} className="py-16 px-4">
-        <div className="max-w-3xl mx-auto text-center">
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5" style={{ background: "rgba(0,208,132,0.1)" }}>
-            <ArrowLeftRight size={24} style={{ color: "#00D084" }} />
-          </div>
-          <h2 className="text-2xl font-bold mb-3" style={{ color: "#0B1A2B" }}>Vous avez un iPhone à échanger ?</h2>
-          <p className="mb-8 max-w-md mx-auto" style={{ color: "#8A99AA" }}>
-            Trouvez un iPhone qui vous intéresse, proposez le vôtre en troc, et notre IA calcule la soulte équitable. Simple, rapide, transparent.
-          </p>
-          <button
-            className="btn btn-lg"
-            style={{ background: "#0B1A2B", color: "#00D084", border: "1px solid rgba(0,208,132,0.2)" }}
-            onClick={() => { selectSeries(""); listingsRef.current?.scrollIntoView({ behavior: "smooth" }); }}
-          >
-            <ArrowLeftRight size={16} />
-            Voir les annonces avec troc
           </button>
         </div>
       </section>
