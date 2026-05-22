@@ -60,11 +60,13 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Already processed.']);
         }
 
-        // Vérifier le statut : "completed" = validé, "pending" = en attente, "notcompleted" = annulé
-        $status = $request->input('description') ?? '';
+        // ⚠️ Ne jamais faire confiance au corps de la requête POST pour confirmer un paiement.
+        // On vérifie toujours auprès de l'API PayPlus (source de vérité).
+        $token = $listing->payment_reference ?? $invoiceToken;
+        $paid  = $this->paymentService->verifyPayment($token);
 
-        if ($status !== 'completed') {
-            return response()->json(['message' => 'Payment not completed yet.'], 422);
+        if (!$paid) {
+            return response()->json(['message' => 'Payment not confirmed by PayPlus.'], 422);
         }
 
         $this->confirmPayment($listing);

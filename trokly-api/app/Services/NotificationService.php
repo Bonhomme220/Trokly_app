@@ -116,6 +116,22 @@ class NotificationService
         );
     }
 
+    public function listingExpired(User $seller, string $iphoneModel, int $price): void
+    {
+        $priceFormatted = number_format($price, 0, ',', ' ') . ' FCFA';
+        $republishUrl   = config('app.frontend_url', 'https://trokly-web.onrender.com') . '/listings/new';
+
+        $body = "<p>Bonjour <strong>{$seller->full_name}</strong>,</p>
+                 <p>Votre annonce pour le <strong>{$iphoneModel}</strong> ({$priceFormatted}) a expiré après 30 jours.</p>
+                 <p>Si vous souhaitez toujours vendre cet iPhone, vous pouvez republier une nouvelle annonce rapidement.</p>";
+
+        $this->send(
+            $seller->email,
+            "⏰ Votre annonce a expiré",
+            $this->template("Annonce expirée", $body, "Republier mon iPhone", $republishUrl)
+        );
+    }
+
     // ─── VENTE ─────────────────────────────────────────────────
 
     public function phoneSold(User $seller, string $iphoneModel, int $amount): void

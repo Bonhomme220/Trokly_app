@@ -1,8 +1,16 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+/*
+|--------------------------------------------------------------------------
+| Console Routes (Laravel 11 Scheduler)
+|--------------------------------------------------------------------------
+|
+| Ce fichier est chargé automatiquement par bootstrap/app.php.
+| Chaque tâche planifiée est définie ici via la façade Schedule.
+|
+*/
+
+// Dépublier les annonces expirées tous les jours à 02h00
+Schedule::command('listings:expire')->dailyAt('02:00');
