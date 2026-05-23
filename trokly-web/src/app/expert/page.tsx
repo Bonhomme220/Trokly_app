@@ -33,9 +33,9 @@ const GRADES = [
   { value: "C", label: "Grade C", desc: "Marques visibles mais appareil fonctionnel" },
 ];
 
-interface ExpertiseListing extends Listing {
+type ExpertiseListing = Omit<Listing, "expertise"> & {
   expertise?: { id: number };
-}
+};
 
 interface FormState {
   checklist: Record<string, boolean>;
