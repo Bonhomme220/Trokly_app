@@ -8,13 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 
-type Step = "phone" | "otp" | "details";
+type Step = "email" | "otp" | "details";
 
 export default function RegisterPage() {
   const { login } = useAuth();
   const router = useRouter();
-  const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,10 +22,10 @@ export default function RegisterPage() {
 
   async function sendOtp() {
     setError("");
-    if (!phone.trim()) return setError("Entrez votre numéro de téléphone.");
+    if (!email.trim()) return setError("Entrez votre adresse email.");
     setLoading(true);
     try {
-      await api.post("/auth/otp/send", { phone_number: phone, type: "registration" });
+      await api.post("/auth/otp/send", { email, type: "registration" });
       setStep("otp");
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
@@ -43,7 +43,7 @@ export default function RegisterPage() {
     if (otp.length !== 6) return setError("Le code doit contenir 6 chiffres.");
     setLoading(true);
     try {
-      await api.post("/auth/otp/verify", { phone_number: phone, code: otp, type: "registration" });
+      await api.post("/auth/otp/verify", { email, code: otp, type: "registration" });
       setStep("details");
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
@@ -59,7 +59,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const res = await api.post("/auth/register", {
-        phone_number: phone,
+        email,
         code: otp,
         full_name: fullName,
       });
@@ -73,7 +73,7 @@ export default function RegisterPage() {
     }
   }
 
-  const steps = ["phone", "otp", "details"];
+  const steps = ["email", "otp", "details"];
   const stepIndex = steps.indexOf(step);
 
   return (
@@ -98,15 +98,15 @@ export default function RegisterPage() {
         </div>
 
         <div className="card p-6 space-y-4">
-          {step === "phone" && (
+          {step === "email" && (
             <>
               <Input
-                label="Numéro de téléphone"
-                id="phone"
-                type="tel"
-                placeholder="+229 97 00 00 00"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                label="Adresse email"
+                id="email"
+                type="email"
+                placeholder="vous@exemple.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendOtp()}
                 error={error}
               />
@@ -120,9 +120,11 @@ export default function RegisterPage() {
             <>
               <div className="space-y-2">
                 <label className="text-sm font-medium block" style={{ color: "#0B1A2B" }}>
-                  Code envoyé au {phone}
+                  Code envoyé à {email}
                 </label>
                 <input
+                  id="otp"
+                  name="otp"
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
@@ -141,9 +143,9 @@ export default function RegisterPage() {
               <button
                 className="w-full text-sm text-center"
                 style={{ color: "#8A99AA" }}
-                onClick={() => { setStep("phone"); setOtp(""); setError(""); }}
+                onClick={() => { setStep("email"); setOtp(""); setError(""); }}
               >
-                Modifier le numéro
+                Modifier l'email
               </button>
             </>
           )}
@@ -153,6 +155,7 @@ export default function RegisterPage() {
               <Input
                 label="Nom complet"
                 id="full_name"
+                name="full_name"
                 placeholder="Ex: Jean Adéyèmi"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
