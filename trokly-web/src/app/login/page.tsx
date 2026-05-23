@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
@@ -13,8 +13,6 @@ type Step = "phone" | "otp";
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
-  useEffect(() => { router.replace("/"); }, [router]);
-  return null;
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
