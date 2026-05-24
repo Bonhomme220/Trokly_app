@@ -19,7 +19,7 @@ return [
     ],
 
     'brevo' => [
-        'key' => env('BREVO_API_KEY'),
+        'key' => env('BREVO_KEY'),
     ],
 
     'ses' => [
