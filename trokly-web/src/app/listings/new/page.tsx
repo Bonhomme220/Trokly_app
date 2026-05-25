@@ -89,7 +89,7 @@ export default function NewListingPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) router.push("/login");
+    if (!loading && !isAuthenticated) router.push("/register?next=/listings/new");
   }, [loading, isAuthenticated, router]);
 
   function setField(key: string, value: unknown) {

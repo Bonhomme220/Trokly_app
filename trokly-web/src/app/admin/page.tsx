@@ -136,6 +136,7 @@ export default function AdminDashboard() {
   const [staffList, setStaffList] = useState<User[]>([]);
   const [staffForm, setStaffForm] = useState({ full_name: "", email: "", role: "expert" });
   const [sellerSearch, setSellerSearch] = useState("");
+  const [sellerFilter, setSellerFilter] = useState<"all" | "active">("all");
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
   const [staffSuccess, setStaffSuccess] = useState("");
@@ -569,6 +570,29 @@ export default function AdminDashboard() {
           {/* ── VENDEURS ── */}
           {tab === "sellers" && isAdmin && (
             <div className="space-y-3">
+              {/* Filtres */}
+              <div className="flex items-center gap-2 mb-3">
+                {(["all", "active"] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setSellerFilter(f)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                    style={sellerFilter === f
+                      ? { background: "#0B1A2B", color: "#00D084" }
+                      : { background: "white", color: "#8A99AA", border: "1px solid rgba(11,26,43,0.12)" }}
+                  >
+                    {f === "all" ? "Tous" : "Avec annonces"}
+                  </button>
+                ))}
+                <span className="text-xs ml-auto" style={{ color: "#8A99AA" }}>
+                  {sellers.filter(s =>
+                    (sellerFilter === "all" || s.listings_count > 0) &&
+                    (s.full_name.toLowerCase().includes(sellerSearch.toLowerCase()) ||
+                     s.email.toLowerCase().includes(sellerSearch.toLowerCase()))
+                  ).length} vendeur{sellers.length > 1 ? "s" : ""}
+                </span>
+              </div>
+
               {/* Barre de recherche */}
               <div className="relative mb-2">
                 <Users size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#8A99AA" }} />
@@ -588,15 +612,17 @@ export default function AdminDashboard() {
               </div>
 
               {sellers.filter(s =>
-                s.full_name.toLowerCase().includes(sellerSearch.toLowerCase()) ||
-                s.email.toLowerCase().includes(sellerSearch.toLowerCase())
+                (sellerFilter === "all" || s.listings_count > 0) &&
+                (s.full_name.toLowerCase().includes(sellerSearch.toLowerCase()) ||
+                 s.email.toLowerCase().includes(sellerSearch.toLowerCase()))
               ).length === 0
                 ? <p className="text-center py-12 text-sm" style={{ color: "#8A99AA" }}>
-                    {sellerSearch ? `Aucun résultat pour "${sellerSearch}"` : "Aucun vendeur."}
+                    {sellerSearch ? `Aucun résultat pour "${sellerSearch}"` : sellerFilter === "active" ? "Aucun vendeur avec annonce." : "Aucun vendeur."}
                   </p>
                 : sellers.filter(s =>
-                    s.full_name.toLowerCase().includes(sellerSearch.toLowerCase()) ||
-                    s.email.toLowerCase().includes(sellerSearch.toLowerCase())
+                    (sellerFilter === "all" || s.listings_count > 0) &&
+                    (s.full_name.toLowerCase().includes(sellerSearch.toLowerCase()) ||
+                     s.email.toLowerCase().includes(sellerSearch.toLowerCase()))
                   ).map(s => (
                   <div key={s.id} className="card p-4">
                     <div className="flex items-start gap-3">

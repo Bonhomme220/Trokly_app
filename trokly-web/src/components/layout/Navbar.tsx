@@ -121,7 +121,7 @@ export default function Navbar() {
           ) : (
             <div className="flex items-center gap-2 ml-2">
               <Link href="/login"><Button variant="ghost" size="sm">Connexion</Button></Link>
-              <Link href="/listings/new"><Button size="sm">Vendre mon iPhone</Button></Link>
+              <Link href="/register?next=/listings/new"><Button size="sm">Vendre mon iPhone</Button></Link>
             </div>
           )}
         </div>
@@ -193,7 +193,7 @@ export default function Navbar() {
               <Link href="/login" onClick={() => setMenuOpen(false)}>
                 <Button variant="secondary" className="w-full">Connexion</Button>
               </Link>
-              <Link href="/listings/new" onClick={() => setMenuOpen(false)}>
+              <Link href="/register?next=/listings/new" onClick={() => setMenuOpen(false)}>
                 <Button className="w-full">Vendre mon iPhone</Button>
               </Link>
             </div>

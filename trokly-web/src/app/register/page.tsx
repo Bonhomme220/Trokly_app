@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,9 +10,11 @@ import Input from "@/components/ui/Input";
 
 type Step = "email" | "otp" | "details";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") || "/seller";
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -64,7 +66,7 @@ export default function RegisterPage() {
         full_name: fullName,
       });
       await login(res.data.token);
-      router.push("/");
+      router.push(next);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };
       setError(err.response?.data?.message || "Erreur lors de l'inscription.");
@@ -172,11 +174,19 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm mt-6" style={{ color: "#8A99AA" }}>
           Déjà un compte ?{" "}
-          <Link href="/login" className="font-medium" style={{ color: "#0B1A2B" }}>
+          <Link href={`/login?next=${encodeURIComponent(next)}`} className="font-medium" style={{ color: "#0B1A2B" }}>
             Se connecter
           </Link>
         </p>
       </div>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }
