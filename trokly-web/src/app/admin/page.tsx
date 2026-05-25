@@ -135,6 +135,7 @@ export default function AdminDashboard() {
   const [leads, setLeads] = useState<{ id: number; full_name: string; phone_number: string; profile: string; city: string; has_iphone_to_sell: boolean; created_at: string }[]>([]);
   const [staffList, setStaffList] = useState<User[]>([]);
   const [staffForm, setStaffForm] = useState({ full_name: "", email: "", role: "expert" });
+  const [sellerSearch, setSellerSearch] = useState("");
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
   const [staffSuccess, setStaffSuccess] = useState("");
@@ -568,9 +569,35 @@ export default function AdminDashboard() {
           {/* ── VENDEURS ── */}
           {tab === "sellers" && isAdmin && (
             <div className="space-y-3">
-              {sellers.length === 0
-                ? <p className="text-center py-12 text-sm" style={{ color: "#8A99AA" }}>Aucun vendeur.</p>
-                : sellers.map(s => (
+              {/* Barre de recherche */}
+              <div className="relative mb-2">
+                <Users size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "#8A99AA" }} />
+                <input
+                  type="text"
+                  placeholder="Rechercher par nom ou email…"
+                  value={sellerSearch}
+                  onChange={e => setSellerSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border outline-none"
+                  style={{ borderColor: "rgba(11,26,43,0.12)", background: "white", color: "#0B1A2B" }}
+                />
+                {sellerSearch && (
+                  <button onClick={() => setSellerSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <X size={14} style={{ color: "#8A99AA" }} />
+                  </button>
+                )}
+              </div>
+
+              {sellers.filter(s =>
+                s.full_name.toLowerCase().includes(sellerSearch.toLowerCase()) ||
+                s.email.toLowerCase().includes(sellerSearch.toLowerCase())
+              ).length === 0
+                ? <p className="text-center py-12 text-sm" style={{ color: "#8A99AA" }}>
+                    {sellerSearch ? `Aucun résultat pour "${sellerSearch}"` : "Aucun vendeur."}
+                  </p>
+                : sellers.filter(s =>
+                    s.full_name.toLowerCase().includes(sellerSearch.toLowerCase()) ||
+                    s.email.toLowerCase().includes(sellerSearch.toLowerCase())
+                  ).map(s => (
                   <div key={s.id} className="card p-4">
                     <div className="flex items-start gap-3">
                       {/* Avatar */}
