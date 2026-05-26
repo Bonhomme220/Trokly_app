@@ -29,7 +29,14 @@ export default function KycPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
     api.get("/kyc/status")
-      .then(res => setKyc(res.data.kyc || null))
+      .then(res => {
+        // L'API retourne directement { status, ... } sans clé 'kyc'
+        if (res.data.status && res.data.status !== "not_submitted") {
+          setKyc(res.data);
+        } else {
+          setKyc(null);
+        }
+      })
       .catch(() => setKyc(null))
       .finally(() => setDataLoading(false));
   }, [isAuthenticated]);
@@ -57,8 +64,8 @@ export default function KycPage() {
     if (!documentUrl) return setError("Veuillez ajouter votre document.");
     setSubmitting(true);
     try {
-      const res = await api.post("/kyc", { document_type: documentType, document_url: documentUrl });
-      setKyc(res.data.kyc);
+      const res = await api.post("/kyc", { document_url: documentUrl, document_type: documentType });
+      setKyc(res.data.kyc ?? { status: "pending", rejection_reason: null, verified_at: null });
       setSuccess(true);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };

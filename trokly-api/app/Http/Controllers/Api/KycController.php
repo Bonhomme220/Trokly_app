@@ -18,16 +18,24 @@ class KycController extends Controller
         }
 
         $request->validate([
-            'id_card_url' => 'required|url',
-            'selfie_url' => 'required|url',
+            'document_url' => 'nullable|url',
+            'id_card_url'  => 'nullable|url',
+            'selfie_url'   => 'nullable|url',
         ]);
+
+        // Accepter document_url ou id_card_url
+        $idCardUrl = $request->id_card_url ?? $request->document_url;
+
+        if (!$idCardUrl) {
+            return response()->json(['message' => 'Veuillez fournir l\'URL du document.'], 422);
+        }
 
         $kyc = Kyc::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'id_card_url' => $request->id_card_url,
-                'selfie_url' => $request->selfie_url,
-                'status' => 'pending',
+                'id_card_url' => $idCardUrl,
+                'selfie_url'  => $request->selfie_url ?? $idCardUrl,
+                'status'      => 'pending',
                 'rejection_reason' => null,
             ]
         );
