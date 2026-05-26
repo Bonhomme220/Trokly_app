@@ -166,7 +166,10 @@ export default function AdminDashboard() {
   // Ambassador state
   const [ambassadors, setAmbassadors] = useState<AmbassadorCode[]>([]);
   const [ambassadorWithdrawals, setAmbassadorWithdrawals] = useState<AmbassadorWithdrawal[]>([]);
-  const [ambassadorForm, setAmbassadorForm] = useState({ user_id: "", discount_percent: "20", commission_percent: "10" });
+  const [ambassadorForm, setAmbassadorForm] = useState({ user_id: 0, discount_percent: "20", commission_percent: "10" });
+  const [ambassadorSellerSearch, setAmbassadorSellerSearch] = useState("");
+  const [ambassadorSellerSelected, setAmbassadorSellerSelected] = useState<AdminSeller | null>(null);
+  const [ambassadorSellerOpen, setAmbassadorSellerOpen] = useState(false);
   const [ambassadorFormError, setAmbassadorFormError] = useState("");
   const [ambassadorFormSuccess, setAmbassadorFormSuccess] = useState("");
   const [ambassadorFormLoading, setAmbassadorFormLoading] = useState(false);
@@ -239,12 +242,14 @@ export default function AdminDashboard() {
         const res = await api.get("/leads").catch(() => ({ data: { data: [] } }));
         setLeads(res.data.data || []);
       } else if (tab === "ambassadors") {
-        const [amRes, wdRes] = await Promise.all([
+        const [amRes, wdRes, sellersRes] = await Promise.all([
           api.get("/admin/ambassadors").catch(() => ({ data: { data: [] } })),
           api.get(`/admin/ambassador-withdrawals?status=${withdrawalFilter}`).catch(() => ({ data: { data: [] } })),
+          api.get("/admin/sellers").catch(() => ({ data: { data: [] } })),
         ]);
         setAmbassadors(amRes.data.data || []);
         setAmbassadorWithdrawals(wdRes.data.data || []);
+        setSellers(sellersRes.data.data || []);
       }
     } finally {
       setDataLoading(false);
@@ -304,22 +309,28 @@ export default function AdminDashboard() {
 
   async function createAmbassadorCode() {
     setAmbassadorFormError(""); setAmbassadorFormSuccess("");
-    const uid = parseInt(ambassadorForm.user_id);
+    if (!ambassadorSellerSelected) return setAmbassadorFormError("Sélectionnez un vendeur.");
     const disc = parseInt(ambassadorForm.discount_percent);
     const comm = parseInt(ambassadorForm.commission_percent);
-    if (!uid) return setAmbassadorFormError("ID utilisateur requis.");
     if (!disc || disc < 1 || disc > 50) return setAmbassadorFormError("Réduction entre 1 et 50 %.");
     if (!comm || comm < 1 || comm > 30) return setAmbassadorFormError("Commission entre 1 et 30 %.");
     setAmbassadorFormLoading(true);
     try {
       const res = await api.post("/admin/ambassadors", {
-        user_id: uid,
+        user_id: ambassadorSellerSelected.id,
         discount_percent: disc,
         commission_percent: comm,
       });
       setAmbassadorFormSuccess(res.data.message);
-      setAmbassadorForm({ user_id: "", discount_percent: "20", commission_percent: "10" });
-      setAmbassadors(prev => [{ ...res.data.code, user: res.data.code.user ?? { id: uid, full_name: "", email: "" }, total_commissions: 0, wallet_balance: 0 }, ...prev]);
+      setAmbassadorSellerSelected(null);
+      setAmbassadorSellerSearch("");
+      setAmbassadorForm(f => ({ ...f, discount_percent: "20", commission_percent: "10" }));
+      setAmbassadors(prev => [{
+        ...res.data.code,
+        user: { id: ambassadorSellerSelected.id, full_name: ambassadorSellerSelected.full_name, email: ambassadorSellerSelected.email },
+        total_commissions: 0,
+        wallet_balance: 0,
+      }, ...prev]);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
       const msg = err.response?.data?.errors
@@ -933,33 +944,92 @@ export default function AdminDashboard() {
                   <h2 className="font-semibold text-lg" style={{ color: "#0B1A2B" }}>Créer un code ambassadeur</h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div className="space-y-4 mb-4">
+                  {/* Sélecteur vendeur */}
                   <div>
                     <label className="text-xs font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>
-                      ID utilisateur *
+                      Vendeur *
                     </label>
-                    <input className="input" type="number" placeholder="Ex: 42"
-                      value={ambassadorForm.user_id}
-                      onChange={e => setAmbassadorForm(f => ({ ...f, user_id: e.target.value }))} />
-                    <p className="text-xs mt-1" style={{ color: "#8A99AA" }}>
-                      Trouvez l'ID dans l'onglet Vendeurs
-                    </p>
+                    {ambassadorSellerSelected ? (
+                      <div className="flex items-center justify-between px-4 py-3 rounded-xl"
+                        style={{ background: "rgba(0,208,132,0.08)", border: "1.5px solid rgba(0,208,132,0.3)" }}>
+                        <div>
+                          <p className="text-sm font-semibold" style={{ color: "#0B1A2B" }}>
+                            {ambassadorSellerSelected.full_name}
+                          </p>
+                          <p className="text-xs" style={{ color: "#8A99AA" }}>{ambassadorSellerSelected.email}</p>
+                        </div>
+                        <button onClick={() => { setAmbassadorSellerSelected(null); setAmbassadorSellerSearch(""); }}
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-sm"
+                          style={{ background: "rgba(11,26,43,0.08)", color: "#0B1A2B" }}>
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input
+                          className="input"
+                          placeholder="Rechercher par nom ou email…"
+                          value={ambassadorSellerSearch}
+                          onChange={e => { setAmbassadorSellerSearch(e.target.value); setAmbassadorSellerOpen(true); }}
+                          onFocus={() => setAmbassadorSellerOpen(true)}
+                          onBlur={() => setTimeout(() => setAmbassadorSellerOpen(false), 150)}
+                        />
+                        {ambassadorSellerOpen && ambassadorSellerSearch.length >= 1 && (() => {
+                          const q = ambassadorSellerSearch.toLowerCase();
+                          const filtered = sellers.filter(s =>
+                            s.full_name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q)
+                          ).slice(0, 6);
+                          return filtered.length > 0 ? (
+                            <div className="absolute z-30 top-full mt-1 left-0 right-0 rounded-xl shadow-xl overflow-hidden"
+                              style={{ background: "white", border: "1px solid rgba(11,26,43,0.1)" }}>
+                              {filtered.map(s => (
+                                <button key={s.id}
+                                  onMouseDown={() => { setAmbassadorSellerSelected(s); setAmbassadorSellerOpen(false); }}
+                                  className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between"
+                                  style={{ borderBottom: "1px solid rgba(11,26,43,0.05)" }}>
+                                  <div>
+                                    <p className="text-sm font-medium" style={{ color: "#0B1A2B" }}>{s.full_name}</p>
+                                    <p className="text-xs" style={{ color: "#8A99AA" }}>{s.email}</p>
+                                  </div>
+                                  <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0"
+                                    style={{ background: "rgba(11,26,43,0.06)", color: "#8A99AA" }}>
+                                    {s.listings_count} annonce{s.listings_count !== 1 ? "s" : ""}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="absolute z-30 top-full mt-1 left-0 right-0 rounded-xl shadow-xl px-4 py-3"
+                              style={{ background: "white", border: "1px solid rgba(11,26,43,0.1)" }}>
+                              <p className="text-sm" style={{ color: "#8A99AA" }}>Aucun vendeur trouvé.</p>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>
-                      Réduction offerte (%)
-                    </label>
-                    <input className="input" type="number" min={1} max={50} placeholder="20"
-                      value={ambassadorForm.discount_percent}
-                      onChange={e => setAmbassadorForm(f => ({ ...f, discount_percent: e.target.value }))} />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>
-                      Commission ambassadeur (%)
-                    </label>
-                    <input className="input" type="number" min={1} max={30} placeholder="10"
-                      value={ambassadorForm.commission_percent}
-                      onChange={e => setAmbassadorForm(f => ({ ...f, commission_percent: e.target.value }))} />
+
+                  {/* Discount + Commission */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>
+                        Réduction offerte (%)
+                      </label>
+                      <input className="input" type="number" min={1} max={50} placeholder="20"
+                        value={ambassadorForm.discount_percent}
+                        onChange={e => setAmbassadorForm(f => ({ ...f, discount_percent: e.target.value }))} />
+                      <p className="text-xs mt-1" style={{ color: "#8A99AA" }}>Offerte aux acheteurs qui utilisent le code</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>
+                        Commission ambassadeur (%)
+                      </label>
+                      <input className="input" type="number" min={1} max={30} placeholder="10"
+                        value={ambassadorForm.commission_percent}
+                        onChange={e => setAmbassadorForm(f => ({ ...f, commission_percent: e.target.value }))} />
+                      <p className="text-xs mt-1" style={{ color: "#8A99AA" }}>Reversée à l'ambassadeur sur chaque vente</p>
+                    </div>
                   </div>
                 </div>
 
