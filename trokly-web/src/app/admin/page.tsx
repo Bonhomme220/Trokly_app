@@ -12,10 +12,35 @@ import {
   LayoutDashboard, Package, Microscope, TrendingUp,
   CheckCircle, XCircle, ShoppingBag, Users, Clock,
   Ban, UserCheck, UserPlus, Shield, ListChecks, Phone, MapPin,
-  BadgeCheck, Zap, Euro, Gift, X,
+  BadgeCheck, Zap, Euro, Gift, X, Tag, Wallet, ArrowDownCircle,
 } from "lucide-react";
 
-type Tab = "overview" | "revenue" | "listings" | "expertises" | "sellers" | "staff" | "leads";
+type Tab = "overview" | "revenue" | "listings" | "expertises" | "sellers" | "staff" | "leads" | "ambassadors";
+
+interface AmbassadorCode {
+  id: number;
+  code: string;
+  discount_percent: number;
+  commission_percent: number;
+  uses_count: number;
+  is_active: boolean;
+  total_commissions: number;
+  wallet_balance: number;
+  created_at: string;
+  user: { id: number; full_name: string; email: string };
+}
+
+interface AmbassadorWithdrawal {
+  id: number;
+  amount: number;
+  status: "pending" | "paid" | "rejected";
+  payment_method: string;
+  payment_details: string;
+  admin_note: string | null;
+  paid_at: string | null;
+  created_at: string;
+  user: { id: number; full_name: string; email: string };
+}
 
 interface AdminListing extends Listing {
   seller: { id: number; full_name: string };
@@ -137,6 +162,16 @@ export default function AdminDashboard() {
   const [staffForm, setStaffForm] = useState({ full_name: "", email: "", role: "expert" });
   const [sellerSearch, setSellerSearch] = useState("");
   const [sellerFilter, setSellerFilter] = useState<"all" | "active">("all");
+
+  // Ambassador state
+  const [ambassadors, setAmbassadors] = useState<AmbassadorCode[]>([]);
+  const [ambassadorWithdrawals, setAmbassadorWithdrawals] = useState<AmbassadorWithdrawal[]>([]);
+  const [ambassadorForm, setAmbassadorForm] = useState({ user_id: "", discount_percent: "20", commission_percent: "10" });
+  const [ambassadorFormError, setAmbassadorFormError] = useState("");
+  const [ambassadorFormSuccess, setAmbassadorFormSuccess] = useState("");
+  const [ambassadorFormLoading, setAmbassadorFormLoading] = useState(false);
+  const [ambassadorActionLoading, setAmbassadorActionLoading] = useState<number | null>(null);
+  const [withdrawalFilter, setWithdrawalFilter] = useState<"pending" | "all">("pending");
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
   const [staffSuccess, setStaffSuccess] = useState("");
@@ -203,6 +238,13 @@ export default function AdminDashboard() {
       } else if (tab === "leads") {
         const res = await api.get("/leads").catch(() => ({ data: { data: [] } }));
         setLeads(res.data.data || []);
+      } else if (tab === "ambassadors") {
+        const [amRes, wdRes] = await Promise.all([
+          api.get("/admin/ambassadors").catch(() => ({ data: { data: [] } })),
+          api.get(`/admin/ambassador-withdrawals?status=${withdrawalFilter}`).catch(() => ({ data: { data: [] } })),
+        ]);
+        setAmbassadors(amRes.data.data || []);
+        setAmbassadorWithdrawals(wdRes.data.data || []);
       }
     } finally {
       setDataLoading(false);
@@ -260,6 +302,59 @@ export default function AdminDashboard() {
     }
   }
 
+  async function createAmbassadorCode() {
+    setAmbassadorFormError(""); setAmbassadorFormSuccess("");
+    const uid = parseInt(ambassadorForm.user_id);
+    const disc = parseInt(ambassadorForm.discount_percent);
+    const comm = parseInt(ambassadorForm.commission_percent);
+    if (!uid) return setAmbassadorFormError("ID utilisateur requis.");
+    if (!disc || disc < 1 || disc > 50) return setAmbassadorFormError("Réduction entre 1 et 50 %.");
+    if (!comm || comm < 1 || comm > 30) return setAmbassadorFormError("Commission entre 1 et 30 %.");
+    setAmbassadorFormLoading(true);
+    try {
+      const res = await api.post("/admin/ambassadors", {
+        user_id: uid,
+        discount_percent: disc,
+        commission_percent: comm,
+      });
+      setAmbassadorFormSuccess(res.data.message);
+      setAmbassadorForm({ user_id: "", discount_percent: "20", commission_percent: "10" });
+      setAmbassadors(prev => [{ ...res.data.code, user: res.data.code.user ?? { id: uid, full_name: "", email: "" }, total_commissions: 0, wallet_balance: 0 }, ...prev]);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string; errors?: Record<string, string[]> } } };
+      const msg = err.response?.data?.errors
+        ? Object.values(err.response.data.errors)[0]?.[0]
+        : err.response?.data?.message;
+      setAmbassadorFormError(msg || "Erreur.");
+    } finally { setAmbassadorFormLoading(false); }
+  }
+
+  async function toggleAmbassadorCode(id: number) {
+    setAmbassadorActionLoading(id);
+    try {
+      const res = await api.put(`/admin/ambassadors/${id}/toggle`);
+      setAmbassadors(prev => prev.map(a => a.id === id ? { ...a, is_active: res.data.is_active } : a));
+    } finally { setAmbassadorActionLoading(null); }
+  }
+
+  async function approveWithdrawal(id: number) {
+    setAmbassadorActionLoading(id);
+    try {
+      await api.post(`/admin/ambassador-withdrawals/${id}/approve`);
+      setAmbassadorWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: "paid" as const } : w));
+    } finally { setAmbassadorActionLoading(null); }
+  }
+
+  async function rejectWithdrawal(id: number) {
+    const note = prompt("Motif du rejet (obligatoire) :");
+    if (!note) return;
+    setAmbassadorActionLoading(id);
+    try {
+      await api.post(`/admin/ambassador-withdrawals/${id}/reject`, { note });
+      setAmbassadorWithdrawals(prev => prev.map(w => w.id === id ? { ...w, status: "rejected" as const } : w));
+    } finally { setAmbassadorActionLoading(null); }
+  }
+
   async function toggleUserActive(id: number, active: boolean) {
     setActionLoading(id);
     try {
@@ -281,6 +376,7 @@ export default function AdminDashboard() {
     ...(isAdmin ? [{ key: "sellers", label: "Vendeurs", icon: Users }] : []),
     ...(isSuperAdmin ? [{ key: "staff", label: "Équipe", icon: Shield }] : []),
     ...(isSuperAdmin ? [{ key: "leads", label: "Leads", icon: ListChecks }] : []),
+    ...(isAdmin ? [{ key: "ambassadors", label: "Ambassadeurs", icon: Tag }] : []),
   ] as { key: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[];
 
   return (
@@ -821,6 +917,210 @@ export default function AdminDashboard() {
                       </div>
                     ))}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── AMBASSADEURS ── */}
+          {tab === "ambassadors" && (
+            <div className="space-y-8">
+              {/* Create form */}
+              <div className="card p-6">
+                <div className="flex items-center gap-2 mb-5">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,208,132,0.1)" }}>
+                    <Tag size={16} style={{ color: "#00B070" }} />
+                  </div>
+                  <h2 className="font-semibold text-lg" style={{ color: "#0B1A2B" }}>Créer un code ambassadeur</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>
+                      ID utilisateur *
+                    </label>
+                    <input className="input" type="number" placeholder="Ex: 42"
+                      value={ambassadorForm.user_id}
+                      onChange={e => setAmbassadorForm(f => ({ ...f, user_id: e.target.value }))} />
+                    <p className="text-xs mt-1" style={{ color: "#8A99AA" }}>
+                      Trouvez l'ID dans l'onglet Vendeurs
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>
+                      Réduction offerte (%)
+                    </label>
+                    <input className="input" type="number" min={1} max={50} placeholder="20"
+                      value={ambassadorForm.discount_percent}
+                      onChange={e => setAmbassadorForm(f => ({ ...f, discount_percent: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>
+                      Commission ambassadeur (%)
+                    </label>
+                    <input className="input" type="number" min={1} max={30} placeholder="10"
+                      value={ambassadorForm.commission_percent}
+                      onChange={e => setAmbassadorForm(f => ({ ...f, commission_percent: e.target.value }))} />
+                  </div>
+                </div>
+
+                {ambassadorFormError && (
+                  <p className="text-sm mb-3" style={{ color: "#CC0000" }}>{ambassadorFormError}</p>
+                )}
+                {ambassadorFormSuccess && (
+                  <p className="text-sm mb-3 font-medium" style={{ color: "#00B070" }}>{ambassadorFormSuccess}</p>
+                )}
+
+                <Button loading={ambassadorFormLoading} onClick={createAmbassadorCode}>
+                  <Tag size={14} /> Créer le code
+                </Button>
+              </div>
+
+              {/* Ambassadors list */}
+              <div>
+                <h3 className="font-semibold mb-3" style={{ color: "#0B1A2B" }}>
+                  Codes actifs ({ambassadors.length})
+                </h3>
+                {ambassadors.length === 0 ? (
+                  <p className="text-sm text-center py-8" style={{ color: "#8A99AA" }}>Aucun code créé.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {ambassadors.map(a => (
+                      <div key={a.id} className="card p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-1">
+                              <span className="text-xl font-black tracking-widest" style={{ color: "#0B1A2B" }}>{a.code}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${a.is_active ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                                {a.is_active ? "Actif" : "Inactif"}
+                              </span>
+                            </div>
+                            <p className="text-sm" style={{ color: "#4A5568" }}>
+                              {a.user?.full_name} · <span style={{ color: "#8A99AA" }}>{a.user?.email}</span>
+                            </p>
+                            <div className="flex items-center gap-4 mt-2">
+                              <span className="text-xs" style={{ color: "#8A99AA" }}>
+                                <strong style={{ color: "#0B1A2B" }}>−{a.discount_percent}%</strong> réduction
+                              </span>
+                              <span className="text-xs" style={{ color: "#8A99AA" }}>
+                                <strong style={{ color: "#0B1A2B" }}>{a.commission_percent}%</strong> commission
+                              </span>
+                              <span className="text-xs" style={{ color: "#8A99AA" }}>
+                                <strong style={{ color: "#0B1A2B" }}>{a.uses_count}</strong> utilisations
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="mb-2">
+                              <p className="text-xs" style={{ color: "#8A99AA" }}>Total commissions</p>
+                              <p className="font-bold text-sm" style={{ color: "#00B070" }}>
+                                {(a.total_commissions ?? 0).toLocaleString("fr-FR")} FCFA
+                              </p>
+                            </div>
+                            <div className="mb-3">
+                              <p className="text-xs" style={{ color: "#8A99AA" }}>Solde wallet</p>
+                              <p className="font-bold text-sm" style={{ color: "#0B1A2B" }}>
+                                {(a.wallet_balance ?? 0).toLocaleString("fr-FR")} FCFA
+                              </p>
+                            </div>
+                            <button
+                              disabled={ambassadorActionLoading === a.id}
+                              onClick={() => toggleAmbassadorCode(a.id)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                              style={{
+                                background: a.is_active ? "rgba(204,0,0,0.08)" : "rgba(0,208,132,0.1)",
+                                color: a.is_active ? "#CC0000" : "#00B070",
+                              }}>
+                              {ambassadorActionLoading === a.id ? "…" : a.is_active ? "Désactiver" : "Activer"}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Withdrawals */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold" style={{ color: "#0B1A2B" }}>
+                    <ArrowDownCircle size={16} className="inline mr-2" style={{ color: "#8A99AA" }} />
+                    Demandes de retrait
+                  </h3>
+                  <div className="flex gap-1">
+                    {(["pending", "all"] as const).map(f => (
+                      <button key={f}
+                        onClick={() => {
+                          setWithdrawalFilter(f);
+                          api.get(`/admin/ambassador-withdrawals?status=${f}`)
+                            .then(r => setAmbassadorWithdrawals(r.data.data || []))
+                            .catch(() => {});
+                        }}
+                        className="px-3 py-1 rounded-full text-xs font-semibold transition-all"
+                        style={{
+                          background: withdrawalFilter === f ? "#0B1A2B" : "rgba(11,26,43,0.06)",
+                          color: withdrawalFilter === f ? "#00D084" : "#0B1A2B",
+                        }}>
+                        {f === "pending" ? "En attente" : "Tous"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {ambassadorWithdrawals.length === 0 ? (
+                  <p className="text-sm text-center py-8" style={{ color: "#8A99AA" }}>
+                    Aucune demande {withdrawalFilter === "pending" ? "en attente" : ""}.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {ambassadorWithdrawals.map(w => (
+                      <div key={w.id} className="card p-4 flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: "rgba(0,208,132,0.08)" }}>
+                          <Wallet size={16} style={{ color: "#00B070" }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>
+                            {w.user?.full_name} — {w.amount.toLocaleString("fr-FR")} FCFA
+                          </p>
+                          <p className="text-xs" style={{ color: "#8A99AA" }}>
+                            {w.payment_method.toUpperCase()} · {w.payment_details}
+                          </p>
+                          <p className="text-xs" style={{ color: "#8A99AA" }}>
+                            {new Date(w.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                          </p>
+                          {w.admin_note && (
+                            <p className="text-xs mt-0.5 italic" style={{ color: "#8A99AA" }}>Note : {w.admin_note}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {w.status === "pending" ? (
+                            <>
+                              <button
+                                disabled={ambassadorActionLoading === w.id}
+                                onClick={() => approveWithdrawal(w.id)}
+                                className="w-8 h-8 rounded-full flex items-center justify-center"
+                                style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
+                                <CheckCircle size={15} />
+                              </button>
+                              <button
+                                disabled={ambassadorActionLoading === w.id}
+                                onClick={() => rejectWithdrawal(w.id)}
+                                className="w-8 h-8 rounded-full flex items-center justify-center"
+                                style={{ background: "rgba(204,0,0,0.08)", color: "#CC0000" }}>
+                                <XCircle size={15} />
+                              </button>
+                            </>
+                          ) : (
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${w.status === "paid" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+                              {w.status === "paid" ? "Payé" : "Rejeté"}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

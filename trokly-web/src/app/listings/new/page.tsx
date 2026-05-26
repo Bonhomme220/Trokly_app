@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import PhotoUpload from "@/components/ui/PhotoUpload";
 import { CONDITION_LABELS, CONDITION_OPTIONS } from "@/lib/utils";
-import { BadgeCheck, Zap, MessageCircle, Check, AlertTriangle, ChevronRight } from "lucide-react";
+import { BadgeCheck, Zap, MessageCircle, Check, AlertTriangle, ChevronRight, Tag, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 const IPHONE_MODELS = [
@@ -88,6 +88,12 @@ export default function NewListingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  // Ambassador code
+  const [ambassadorCode, setAmbassadorCode] = useState("");
+  const [ambassadorInfo, setAmbassadorInfo] = useState<{ code: string; discount_percent: number; ambassador_name: string } | null>(null);
+  const [ambassadorLoading, setAmbassadorLoading] = useState(false);
+  const [ambassadorError, setAmbassadorError] = useState("");
+
   useEffect(() => {
     if (!loading && !isAuthenticated) router.push("/register?next=/listings/new");
   }, [loading, isAuthenticated, router]);
@@ -97,8 +103,33 @@ export default function NewListingPage() {
   }
 
   const selectedPlan = PLANS.find(p => p.id === plan)!;
-  const totalPrice = selectedPlan.price + (boosted ? 500 : 0);
+  const basePrice = selectedPlan.price + (boosted ? 500 : 0);
+  const discountAmount = ambassadorInfo ? Math.round(basePrice * ambassadorInfo.discount_percent / 100) : 0;
+  const totalPrice = basePrice - discountAmount;
   const hasCredit = (user?.listing_credits ?? 0) > 0;
+
+  async function applyAmbassadorCode() {
+    const code = ambassadorCode.trim().toUpperCase();
+    if (!code) return;
+    setAmbassadorLoading(true);
+    setAmbassadorError("");
+    setAmbassadorInfo(null);
+    try {
+      const res = await api.get(`/ambassador/codes/${code}/check`);
+      setAmbassadorInfo(res.data);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      setAmbassadorError(err.response?.data?.message || "Code invalide.");
+    } finally {
+      setAmbassadorLoading(false);
+    }
+  }
+
+  function removeAmbassadorCode() {
+    setAmbassadorCode("");
+    setAmbassadorInfo(null);
+    setAmbassadorError("");
+  }
 
   async function submit() {
     setError("");
@@ -120,6 +151,7 @@ export default function NewListingPage() {
         is_boosted: boosted,
         sale_type: "marketplace",
         accepts_trade: false,
+        ...(ambassadorInfo ? { ambassador_code: ambassadorInfo.code, discount_amount: discountAmount } : {}),
       });
 
       if (res.data.used_credit) {
@@ -281,17 +313,74 @@ export default function NewListingPage() {
             </div>
           </button>
 
+          {/* Code ambassadeur */}
+          <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(11,26,43,0.08)" }}>
+            {ambassadorInfo ? (
+              <div className="flex items-center justify-between p-3 rounded-xl"
+                style={{ background: "rgba(0,208,132,0.1)", border: "1px solid rgba(0,208,132,0.3)" }}>
+                <div className="flex items-center gap-2">
+                  <Tag size={14} style={{ color: "#00B070" }} />
+                  <div>
+                    <p className="text-xs font-bold" style={{ color: "#00B070" }}>
+                      Code <span style={{ color: "#0B1A2B" }}>{ambassadorInfo.code}</span> appliqué
+                    </p>
+                    <p className="text-xs" style={{ color: "#8A99AA" }}>
+                      −{ambassadorInfo.discount_percent}% • Économie : {discountAmount.toLocaleString("fr-FR")} FCFA
+                    </p>
+                  </div>
+                </div>
+                <button onClick={removeAmbassadorCode} className="text-xs font-medium" style={{ color: "#CC0000" }}>
+                  Retirer
+                </button>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-medium mb-2" style={{ color: "#0B1A2B" }}>
+                  <Tag size={12} className="inline mr-1.5" style={{ color: "#8A99AA" }} />
+                  Vous avez un code ambassadeur ?
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    className="input flex-1 uppercase"
+                    placeholder="Ex: AARON20"
+                    value={ambassadorCode}
+                    onChange={e => { setAmbassadorCode(e.target.value); setAmbassadorError(""); }}
+                    onKeyDown={e => e.key === "Enter" && applyAmbassadorCode()}
+                  />
+                  <button
+                    onClick={applyAmbassadorCode}
+                    disabled={ambassadorLoading || !ambassadorCode.trim()}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-1.5"
+                    style={{
+                      background: ambassadorCode.trim() ? "#0B1A2B" : "rgba(11,26,43,0.1)",
+                      color: ambassadorCode.trim() ? "white" : "#8A99AA",
+                    }}>
+                    {ambassadorLoading ? <Loader2 size={14} className="animate-spin" /> : "Appliquer"}
+                  </button>
+                </div>
+                {ambassadorError && (
+                  <p className="text-xs mt-1.5" style={{ color: "#CC0000" }}>{ambassadorError}</p>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Total */}
           <div className="mt-4 pt-4 flex items-center justify-between"
             style={{ borderTop: "1px solid rgba(11,26,43,0.08)" }}>
             <p className="text-sm font-medium" style={{ color: "#8A99AA" }}>Total à payer</p>
             <div className="text-right">
+              {ambassadorInfo && !hasCredit && (
+                <p className="text-xs line-through" style={{ color: "#8A99AA" }}>
+                  {basePrice.toLocaleString("fr-FR")} FCFA
+                </p>
+              )}
               <p className="text-xl font-black" style={{ color: "#0B1A2B" }}>
                 {hasCredit ? "Gratuit" : `${totalPrice.toLocaleString("fr-FR")} FCFA`}
               </p>
               {hasCredit && (
                 <p className="text-xs" style={{ color: "#8A99AA" }}>
-                  (valeur {totalPrice.toLocaleString("fr-FR")} FCFA)
+                  (valeur {basePrice.toLocaleString("fr-FR")} FCFA)
                 </p>
               )}
             </div>
@@ -417,6 +506,11 @@ export default function NewListingPage() {
             ? "Publier gratuitement (crédit)"
             : `Continuer vers le paiement — ${totalPrice.toLocaleString("fr-FR")} FCFA`}
         </Button>
+        {ambassadorInfo && !hasCredit && (
+          <p className="text-xs text-center -mt-2" style={{ color: "#00B070" }}>
+            🎁 Code <strong>{ambassadorInfo.code}</strong> : −{ambassadorInfo.discount_percent}% appliqué ({discountAmount.toLocaleString("fr-FR")} FCFA économisés)
+          </p>
+        )}
 
         <p className="text-xs text-center pb-4" style={{ color: "#8A99AA" }}>
           Votre annonce sera active 30 jours.

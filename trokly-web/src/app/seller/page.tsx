@@ -12,7 +12,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import {
   Package, TrendingUp, Eye, Plus, Clock, CheckCircle,
-  BadgeCheck, CreditCard, Zap, EyeOff, CheckSquare, Gift
+  BadgeCheck, CreditCard, Zap, EyeOff, CheckSquare, Gift, Tag
 } from "lucide-react";
 
 type Tab = "overview" | "listings";
@@ -36,6 +36,8 @@ function SellerDashboardInner() {
   const [dataLoading, setDataLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [successMsg, setSuccessMsg] = useState(searchParams.get("listing_published") ? "Annonce publiée avec succès !" : "");
+  const [isAmbassador, setIsAmbassador] = useState(false);
+  const [ambassadorCode, setAmbassadorCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) router.push("/login");
@@ -44,6 +46,12 @@ function SellerDashboardInner() {
   useEffect(() => {
     if (!isAuthenticated) return;
     loadListings();
+    api.get("/ambassador/me").then(r => {
+      if (r.data.is_ambassador) {
+        setIsAmbassador(true);
+        setAmbassadorCode(r.data.code);
+      }
+    }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
@@ -123,6 +131,27 @@ function SellerDashboardInner() {
           <CheckCircle size={16} /> {successMsg}
           <button className="ml-auto text-xs opacity-60" onClick={() => setSuccessMsg("")}>✕</button>
         </div>
+      )}
+
+      {/* Badge ambassadeur */}
+      {isAmbassador && ambassadorCode && (
+        <Link href="/ambassador">
+          <div className="mb-6 p-4 rounded-xl flex items-center gap-3 transition-all hover:opacity-90 cursor-pointer"
+            style={{ background: "rgba(11,26,43,0.04)", border: "1px solid rgba(11,26,43,0.1)" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "#0B1A2B" }}>
+              <Tag size={16} style={{ color: "#00D084" }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold" style={{ color: "#0B1A2B" }}>
+                Vous êtes ambassadeur Trokly 🤝
+              </p>
+              <p className="text-xs" style={{ color: "#8A99AA" }}>
+                Code : <strong style={{ color: "#0B1A2B", letterSpacing: "0.05em" }}>{ambassadorCode}</strong> · Voir mes commissions →
+              </p>
+            </div>
+          </div>
+        </Link>
       )}
 
       {/* Crédit republication */}

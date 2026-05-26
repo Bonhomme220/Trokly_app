@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AmbassadorCode;
 use App\Models\Listing;
+use App\Services\AmbassadorService;
 use App\Services\NotificationService;
 use App\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
@@ -115,6 +117,16 @@ class PaymentController extends Controller
             'status'         => $newStatus,
             'expires_at'     => now()->addDays(30),
         ]);
+
+        // ── Commission ambassadeur si code utilisé ──────────────────────
+        if ($listing->ambassador_code) {
+            $code = AmbassadorCode::where('code', $listing->ambassador_code)
+                ->where('is_active', true)
+                ->first();
+            if ($code) {
+                app(AmbassadorService::class)->recordEarning($listing, $code);
+            }
+        }
 
         $notif = app(NotificationService::class);
 

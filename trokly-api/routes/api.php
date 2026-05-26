@@ -19,6 +19,8 @@ use App\Http\Controllers\Api\Admin\AdminUserController;
 use App\Http\Controllers\Api\Admin\AdminDeliveryController;
 use App\Http\Controllers\Api\Admin\AdminLitigationController;
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
+use App\Http\Controllers\Api\Admin\AdminAmbassadorController;
+use App\Http\Controllers\Api\AmbassadorController;
 use Illuminate\Support\Facades\Route;
 
 // Leads pré-lancement (public)
@@ -42,6 +44,9 @@ Route::get('sellers/{sellerId}', [ListingController::class, 'sellerProfile']);
 
 // Webhook PayPlus (public, appelé par PayPlus)
 Route::post('payments/webhook', [PaymentController::class, 'webhook']);
+
+// Code ambassadeur (public — vérification avant paiement)
+Route::get('ambassador/codes/{code}/check', [AmbassadorController::class, 'checkCode']);
 
 // Routes authentifiées
 Route::middleware('auth:sanctum')->group(function () {
@@ -93,6 +98,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('notifications/{notification}/read', [NotificationController::class, 'markAsRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
 
+    // Ambassador
+    Route::prefix('ambassador')->group(function () {
+        Route::get('me', [AmbassadorController::class, 'me']);
+        Route::get('earnings', [AmbassadorController::class, 'earnings']);
+        Route::post('withdraw', [AmbassadorController::class, 'withdraw']);
+    });
+
     // Admin
     Route::prefix('admin')->middleware('role:admin|super_admin')->group(function () {
         Route::get('dashboard', [AdminDashboardController::class, 'index']);
@@ -142,6 +154,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('litigations', [AdminLitigationController::class, 'index']);
         Route::get('litigations/{litigation}', [AdminLitigationController::class, 'show']);
         Route::post('litigations/{litigation}/resolve', [AdminLitigationController::class, 'resolve']);
+
+        // Ambassadeurs
+        Route::get('ambassadors', [AdminAmbassadorController::class, 'index']);
+        Route::post('ambassadors', [AdminAmbassadorController::class, 'store']);
+        Route::put('ambassadors/{code}/toggle', [AdminAmbassadorController::class, 'toggle']);
+        Route::get('ambassador-withdrawals', [AdminAmbassadorController::class, 'withdrawals']);
+        Route::post('ambassador-withdrawals/{withdrawal}/approve', [AdminAmbassadorController::class, 'approveWithdrawal']);
+        Route::post('ambassador-withdrawals/{withdrawal}/reject', [AdminAmbassadorController::class, 'rejectWithdrawal']);
     });
 
     // Expert
