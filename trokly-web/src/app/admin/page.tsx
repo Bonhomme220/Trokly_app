@@ -12,10 +12,25 @@ import {
   LayoutDashboard, Package, Microscope, TrendingUp,
   CheckCircle, XCircle, ShoppingBag, Users, Clock,
   Ban, UserCheck, UserPlus, Shield, ListChecks, Phone, MapPin,
-  BadgeCheck, Zap, Euro, Gift, X, Tag, Wallet, ArrowDownCircle,
+  BadgeCheck, Zap, Euro, Gift, X, Tag, Wallet, ArrowDownCircle, FileCheck,
 } from "lucide-react";
 
-type Tab = "overview" | "revenue" | "listings" | "expertises" | "sellers" | "staff" | "leads" | "ambassadors";
+type Tab = "overview" | "revenue" | "listings" | "expertises" | "sellers" | "staff" | "leads" | "ambassadors" | "kyc";
+
+interface KycUser {
+  id: number;
+  full_name: string;
+  email: string;
+  created_at: string;
+  kyc: {
+    id: number;
+    status: string;
+    id_card_url: string;
+    selfie_url: string | null;
+    rejection_reason: string | null;
+    created_at: string;
+  };
+}
 
 interface AmbassadorCode {
   id: number;
@@ -163,6 +178,13 @@ export default function AdminDashboard() {
   const [sellerSearch, setSellerSearch] = useState("");
   const [sellerFilter, setSellerFilter] = useState<"all" | "active">("all");
 
+  // KYC state
+  const [kycUsers, setKycUsers] = useState<KycUser[]>([]);
+  const [kycActionLoading, setKycActionLoading] = useState<number | null>(null);
+  const [kycRejectModal, setKycRejectModal] = useState<KycUser | null>(null);
+  const [kycRejectReason, setKycRejectReason] = useState("");
+  const [kycPreview, setKycPreview] = useState<string | null>(null);
+
   // Ambassador state
   const [ambassadors, setAmbassadors] = useState<AmbassadorCode[]>([]);
   const [ambassadorWithdrawals, setAmbassadorWithdrawals] = useState<AmbassadorWithdrawal[]>([]);
@@ -241,6 +263,9 @@ export default function AdminDashboard() {
       } else if (tab === "leads") {
         const res = await api.get("/leads").catch(() => ({ data: { data: [] } }));
         setLeads(res.data.data || []);
+      } else if (tab === "kyc") {
+        const res = await api.get("/admin/users?kyc_status=pending&per_page=100").catch(() => ({ data: { data: [] } }));
+        setKycUsers(res.data.data || []);
       } else if (tab === "ambassadors") {
         const [amRes, wdRes, sellersRes] = await Promise.all([
           api.get("/admin/ambassadors").catch(() => ({ data: { data: [] } })),
@@ -305,6 +330,25 @@ export default function AdminDashboard() {
     } finally {
       setCreditLoading(false);
     }
+  }
+
+  async function approveKyc(userId: number) {
+    setKycActionLoading(userId);
+    try {
+      await api.post(`/admin/users/${userId}/kyc/approve`);
+      setKycUsers(prev => prev.filter(u => u.id !== userId));
+    } finally { setKycActionLoading(null); }
+  }
+
+  async function rejectKyc() {
+    if (!kycRejectModal || !kycRejectReason.trim()) return;
+    setKycActionLoading(kycRejectModal.id);
+    try {
+      await api.post(`/admin/users/${kycRejectModal.id}/kyc/reject`, { reason: kycRejectReason });
+      setKycUsers(prev => prev.filter(u => u.id !== kycRejectModal.id));
+      setKycRejectModal(null);
+      setKycRejectReason("");
+    } finally { setKycActionLoading(null); }
   }
 
   async function createAmbassadorCode() {
@@ -387,6 +431,7 @@ export default function AdminDashboard() {
     ...(isAdmin ? [{ key: "sellers", label: "Vendeurs", icon: Users }] : []),
     ...(isSuperAdmin ? [{ key: "staff", label: "Équipe", icon: Shield }] : []),
     ...(isSuperAdmin ? [{ key: "leads", label: "Leads", icon: ListChecks }] : []),
+    ...(isAdmin ? [{ key: "kyc", label: "KYC", icon: FileCheck, badge: tab !== "kyc" ? kycUsers.length || undefined : undefined }] : []),
     ...(isAdmin ? [{ key: "ambassadors", label: "Ambassadeurs", icon: Tag }] : []),
   ] as { key: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[];
 
@@ -932,6 +977,80 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* ── KYC ── */}
+          {tab === "kyc" && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-semibold text-lg" style={{ color: "#0B1A2B" }}>
+                  Demandes KYC en attente ({kycUsers.length})
+                </h2>
+              </div>
+
+              {kycUsers.length === 0 ? (
+                <div className="card p-12 text-center">
+                  <FileCheck size={36} className="mx-auto mb-3 opacity-20" style={{ color: "#0B1A2B" }} />
+                  <p className="font-semibold" style={{ color: "#0B1A2B" }}>Aucun KYC en attente</p>
+                  <p className="text-sm mt-1" style={{ color: "#8A99AA" }}>Toutes les demandes ont été traitées.</p>
+                </div>
+              ) : kycUsers.map(u => (
+                <div key={u.id} className="card p-5">
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                        style={{ background: "#0B1A2B", color: "#00D084" }}>
+                        {u.full_name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-semibold" style={{ color: "#0B1A2B" }}>{u.full_name}</p>
+                        <p className="text-xs" style={{ color: "#8A99AA" }}>{u.email}</p>
+                        <p className="text-xs" style={{ color: "#8A99AA" }}>
+                          Soumis le {new Date(u.kyc.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        disabled={kycActionLoading === u.id}
+                        onClick={() => approveKyc(u.id)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+                        style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
+                        <CheckCircle size={14} />
+                        {kycActionLoading === u.id ? "…" : "Approuver"}
+                      </button>
+                      <button
+                        disabled={kycActionLoading === u.id}
+                        onClick={() => { setKycRejectModal(u); setKycRejectReason(""); }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all"
+                        style={{ background: "rgba(204,0,0,0.08)", color: "#CC0000" }}>
+                        <XCircle size={14} /> Rejeter
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Document */}
+                  <div>
+                    <p className="text-xs font-medium mb-2" style={{ color: "#8A99AA" }}>Document d'identité</p>
+                    <button
+                      onClick={() => setKycPreview(u.kyc.id_card_url)}
+                      className="relative rounded-xl overflow-hidden block w-full max-w-xs"
+                      style={{ border: "1px solid rgba(11,26,43,0.1)" }}>
+                      <img
+                        src={u.kyc.id_card_url}
+                        alt="Document KYC"
+                        className="w-full object-cover"
+                        style={{ maxHeight: 180 }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+                        style={{ background: "rgba(11,26,43,0.4)" }}>
+                        <span className="text-white text-xs font-semibold">Agrandir</span>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* ── AMBASSADEURS ── */}
           {tab === "ambassadors" && (
             <div className="space-y-8">
@@ -1196,6 +1315,70 @@ export default function AdminDashboard() {
           )}
         </>
       )}
+      {/* ── MODAL PRÉVISUALISATION DOCUMENT KYC ── */}
+      {kycPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(0,0,0,0.8)" }}
+          onClick={() => setKycPreview(null)}>
+          <div className="relative max-w-3xl w-full" onClick={e => e.stopPropagation()}>
+            <img src={kycPreview} alt="Document KYC" className="w-full rounded-2xl object-contain max-h-screen" />
+            <button
+              onClick={() => setKycPreview(null)}
+              className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(0,0,0,0.6)", color: "white" }}>
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL REJET KYC ── */}
+      {kycRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(11,26,43,0.55)", backdropFilter: "blur(6px)" }}
+          onClick={e => e.target === e.currentTarget && setKycRejectModal(null)}>
+          <div className="w-full max-w-sm rounded-2xl p-6 relative" style={{ background: "white", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+            <button className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(11,26,43,0.06)", color: "#0B1A2B" }}
+              onClick={() => setKycRejectModal(null)}>
+              <X size={14} />
+            </button>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(204,0,0,0.08)" }}>
+                <XCircle size={18} style={{ color: "#CC0000" }} />
+              </div>
+              <div>
+                <p className="font-bold" style={{ color: "#0B1A2B" }}>Rejeter le KYC</p>
+                <p className="text-sm" style={{ color: "#8A99AA" }}>{kycRejectModal.full_name}</p>
+              </div>
+            </div>
+            <label className="text-xs font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>
+              Motif du rejet *
+            </label>
+            <textarea
+              className="input resize-none w-full"
+              rows={3}
+              placeholder="Ex: Document illisible, photo floue, document expiré…"
+              value={kycRejectReason}
+              onChange={e => setKycRejectReason(e.target.value)}
+            />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setKycRejectModal(null)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium"
+                style={{ background: "rgba(11,26,43,0.08)", color: "#0B1A2B" }}>
+                Annuler
+              </button>
+              <Button className="flex-1" loading={kycActionLoading === kycRejectModal.id}
+                onClick={rejectKyc}
+                style={{ background: "#CC0000" }}>
+                Rejeter
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL CRÉDIT ── */}
       {creditModal && (
         <div
