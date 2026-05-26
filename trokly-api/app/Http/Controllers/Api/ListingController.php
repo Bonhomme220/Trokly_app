@@ -8,6 +8,7 @@ use App\Models\ListingPhoto;
 use App\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ListingController extends Controller
 {
@@ -92,65 +93,67 @@ class ListingController extends Controller
             }
         }
 
-        // Utiliser un crédit si disponible
         $seller = $request->user();
-        $usedCredit = false;
 
-        if ($seller->listing_credits > 0) {
-            $seller->decrement('listing_credits');
-            $usedCredit = true;
-        }
+        return DB::transaction(function () use ($request, $seller) {
+            // Utiliser un crédit si disponible — dans la transaction pour rollback auto si echec
+            $usedCredit = false;
+            if ($seller->listing_credits > 0) {
+                $seller->decrement('listing_credits');
+                $usedCredit = true;
+            }
 
-        $listing = Listing::create([
-            'seller_id'       => $seller->id,
-            'iphone_model'    => $request->iphone_model,
-            'capacity'        => $request->capacity,
-            'color'           => $request->color,
-            'condition'       => $request->condition,
-            'imei'            => $request->imei,
-            'description'     => $request->description,
-            'asking_price'    => $request->asking_price,
-            'whatsapp_number' => $request->whatsapp_number,
-            'plan'            => $request->plan,
-            'is_boosted'      => $request->boolean('is_boosted'),
-            'sale_type'       => 'marketplace',
-            'accepts_trade'   => false,
-            'payment_status'  => $usedCredit ? 'paid' : 'pending_payment',
-            'status'          => $usedCredit ? ($request->plan === 'basic' ? 'published' : 'pending_expertise') : 'draft',
-            'expires_at'      => $usedCredit ? now()->addDays(30) : null,
-        ]);
-
-        foreach ($request->photos as $index => $url) {
-            ListingPhoto::create([
-                'listing_id' => $listing->id,
-                'url'        => $url,
-                'type'       => 'seller',
-                'order'      => $index,
+            $listing = Listing::create([
+                'seller_id'       => $seller->id,
+                'iphone_model'    => $request->iphone_model,
+                'capacity'        => $request->capacity,
+                'color'           => $request->color,
+                'condition'       => $request->condition,
+                'imei'            => $request->imei ?: null,
+                'description'     => $request->description,
+                'asking_price'    => $request->asking_price,
+                'whatsapp_number' => $request->whatsapp_number,
+                'plan'            => $request->plan,
+                'is_boosted'      => $request->boolean('is_boosted'),
+                'sale_type'       => 'marketplace',
+                'accepts_trade'   => false,
+                'payment_status'  => $usedCredit ? 'paid' : 'pending_payment',
+                'status'          => $usedCredit ? ($request->plan === 'basic' ? 'published' : 'pending_expertise') : 'draft',
+                'expires_at'      => $usedCredit ? now()->addDays(30) : null,
             ]);
-        }
 
-        if ($usedCredit) {
+            foreach ($request->photos as $index => $url) {
+                ListingPhoto::create([
+                    'listing_id' => $listing->id,
+                    'url'        => $url,
+                    'type'       => 'seller',
+                    'order'      => $index,
+                ]);
+            }
+
+            if ($usedCredit) {
+                return response()->json([
+                    'message'     => 'Annonce publiée avec votre crédit.',
+                    'listing'     => $listing->load('photos'),
+                    'used_credit' => true,
+                ], 201);
+            }
+
+            // Générer le lien de paiement
+            $frontUrl  = config('app.frontend_url', 'https://trokly-web.onrender.com');
+            $returnUrl = "{$frontUrl}/listings/payment/success?listing_id={$listing->id}";
+            $cancelUrl = "{$frontUrl}/listings/payment/cancel?listing_id={$listing->id}";
+
+            $paymentData = app(PaymentService::class)->createPaymentLink($listing, $returnUrl, $cancelUrl);
+
             return response()->json([
-                'message'     => 'Annonce publiée avec votre crédit.',
+                'message'     => 'Annonce créée. Procédez au paiement.',
                 'listing'     => $listing->load('photos'),
-                'used_credit' => true,
+                'payment_url' => $paymentData['payment_url'],
+                'amount'      => $paymentData['amount'],
+                'used_credit' => false,
             ], 201);
-        }
-
-        // Générer le lien de paiement
-        $frontUrl  = config('app.frontend_url', 'https://trokly-web.onrender.com');
-        $returnUrl = "{$frontUrl}/listings/payment/success?listing_id={$listing->id}";
-        $cancelUrl = "{$frontUrl}/listings/payment/cancel?listing_id={$listing->id}";
-
-        $paymentData = app(PaymentService::class)->createPaymentLink($listing, $returnUrl, $cancelUrl);
-
-        return response()->json([
-            'message'     => 'Annonce créée. Procédez au paiement.',
-            'listing'     => $listing->load('photos'),
-            'payment_url' => $paymentData['payment_url'],
-            'amount'      => $paymentData['amount'],
-            'used_credit' => false,
-        ], 201);
+        });
     }
 
     public function markSold(Request $request, Listing $listing): JsonResponse
