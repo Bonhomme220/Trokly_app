@@ -72,7 +72,7 @@ class ListingController extends Controller
             'capacity'        => 'required|in:64,128,256,512,1024',
             'color'           => 'required|string|max:50',
             'condition'       => 'required|in:new,like_new,good,fair',
-            'imei'            => 'required|string|unique:listings,imei',
+            'imei'            => 'nullable|string|unique:listings,imei',
             'description'     => 'nullable|string|max:1000',
             'asking_price'    => 'required|integer|min:1000',
             'whatsapp_number' => 'required|string|max:20',
