@@ -89,6 +89,11 @@ function SellerDashboardInner() {
     setActionLoading(listing.id);
     try {
       const res = await api.post(`/payments/${listing.id}/initiate`);
+      if (res.data.used_credit) {
+        setSuccessMsg("Annonce publiée gratuitement avec votre crédit !");
+        loadListings();
+        return;
+      }
       if (res.data.payment_url) window.location.href = res.data.payment_url;
     } catch {
       // ignore
@@ -231,7 +236,9 @@ function SellerDashboardInner() {
                           <p className="text-xs" style={{ color: "#8A99AA" }}>{formatPrice(l.asking_price)}</p>
                         </div>
                         <Button size="sm" loading={actionLoading === l.id} onClick={() => relaunchPayment(l)}>
-                          <CreditCard size={13} /> Payer
+                          {credits > 0
+                            ? <><Gift size={13} /> Publier gratuitement</>
+                            : <><CreditCard size={13} /> Payer</>}
                         </Button>
                       </div>
                     ))}
@@ -280,7 +287,9 @@ function SellerDashboardInner() {
                     {/* Paiement requis */}
                     {l.status === "draft" && l.payment_status === "pending_payment" && (
                       <Button size="sm" loading={actionLoading === l.id} onClick={() => relaunchPayment(l)}>
-                        <CreditCard size={13} /> Finaliser le paiement
+                        {credits > 0
+                          ? <><Gift size={13} /> Publier gratuitement</>
+                          : <><CreditCard size={13} /> Finaliser le paiement</>}
                       </Button>
                     )}
                     {/* Marquer vendu */}

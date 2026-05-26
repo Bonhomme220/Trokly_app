@@ -10,6 +10,7 @@ use App\Services\NotificationService;
 use App\Services\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
@@ -23,6 +24,21 @@ class PaymentController extends Controller
 
         if ($listing->payment_status === 'paid') {
             return response()->json(['message' => 'Cette annonce est déjà payée.'], 422);
+        }
+
+        $seller = $request->user();
+
+        // Utiliser un crédit si disponible
+        if ($seller->listing_credits > 0) {
+            DB::transaction(function () use ($seller, $listing) {
+                $seller->decrement('listing_credits');
+                $this->confirmPayment($listing);
+            });
+
+            return response()->json([
+                'used_credit' => true,
+                'message'     => 'Annonce publiée avec votre crédit.',
+            ]);
         }
 
         $frontUrl  = config('app.frontend_url', 'https://trokly-web.onrender.com');
