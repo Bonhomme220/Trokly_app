@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Listing } from "@/lib/types";
 import { CONDITION_LABELS, formatPrice } from "@/lib/utils";
-import { Zap, Shield, BadgeCheck, Eye, MessageCircle } from "lucide-react";
+import { Shield, BadgeCheck, Eye, MessageCircle } from "lucide-react";
 
 interface Props {
   listing: Listing;
@@ -17,16 +17,22 @@ const CONDITION_COLORS: Record<string, { bg: string; text: string }> = {
 function PlanBadge({ plan }: { plan?: string }) {
   if (plan === "verified_seller") {
     return (
-      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
-        style={{ background: "#0B1A2B", color: "#00D084" }}>
-        <BadgeCheck size={9} /> Vendeur vérifié
-      </span>
+      <>
+        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
+          style={{ background: "#0B1A2B", color: "#00D084" }}>
+          <BadgeCheck size={9} /> Vendeur vérifié
+        </span>
+        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
+          style={{ background: "white", color: "#00875A" }}>
+          <Shield size={9} /> iPhone vérifié
+        </span>
+      </>
     );
   }
   if (plan === "verified_phone") {
     return (
       <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
-        style={{ background: "rgba(0,176,112,0.15)", color: "#00B070" }}>
+        style={{ background: "white", color: "#00875A" }}>
         <Shield size={9} /> iPhone vérifié
       </span>
     );
@@ -59,12 +65,6 @@ export default function ListingCard({ listing }: Props) {
 
           {/* Top-left badges */}
           <div className="absolute top-2.5 left-2.5 flex flex-col gap-1.5">
-            {listing.is_boosted && (
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold"
-                style={{ background: "#F59E0B", color: "white" }}>
-                <Zap size={9} /> TOP
-              </span>
-            )}
             <PlanBadge plan={listing.plan} />
           </div>
 
