@@ -3,32 +3,19 @@
 namespace App\Services;
 
 use App\Models\User;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class NotificationService
 {
     private function send(string $to, string $subject, string $html): void
     {
-        $apiKey = config('services.brevo.key');
-
-        if (!$apiKey) {
-            Log::info("Email [{$subject}] → {$to}");
-            return;
-        }
-
-        $response = Http::withHeaders([
-            'api-key'      => $apiKey,
-            'Content-Type' => 'application/json',
-        ])->post('https://api.brevo.com/v3/smtp/email', [
-            'sender'      => ['name' => 'Trokly', 'email' => 'contact.onepointcom@gmail.com'],
-            'to'          => [['email' => $to]],
-            'subject'     => $subject,
-            'htmlContent' => $html,
-        ]);
-
-        if (!$response->successful()) {
-            Log::error("Brevo email failed [{$subject}] → {$to}: " . $response->body());
+        try {
+            Mail::html($html, function ($message) use ($to, $subject) {
+                $message->to($to)->subject($subject);
+            });
+        } catch (\Throwable $e) {
+            Log::error("Email failed [{$subject}] → {$to}: " . $e->getMessage());
         }
     }
 
