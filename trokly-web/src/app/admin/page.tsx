@@ -150,6 +150,17 @@ function RevenueChart({ data }: { data: Array<{ label: string; revenue: number }
   );
 }
 
+// ─── Status labels (shared) ──────────────────────────────────────────────────
+const STATUS_LABELS: Record<string, { label: string; variant: "signal" | "ink" | "warning" | "error" }> = {
+  pending_expertise: { label: "En attente",  variant: "warning" },
+  under_expertise:   { label: "En cours",    variant: "warning" },
+  published:         { label: "Publiée",     variant: "signal"  },
+  rejected:          { label: "Refusée",     variant: "error"   },
+  sold:              { label: "Vendue",      variant: "ink"     },
+  unpublished:       { label: "Dépubliée",   variant: "ink"     },
+  draft:             { label: "À payer",     variant: "error"   },
+};
+
 // ─── Plan label helper ────────────────────────────────────────────────────────
 const PLAN_LABELS: Record<string, string> = {
   basic: "Basic",
@@ -206,6 +217,16 @@ export default function AdminDashboard() {
   const [creditAmount, setCreditAmount] = useState(1);
   const [creditLoading, setCreditLoading] = useState(false);
   const [creditMsg, setCreditMsg] = useState("");
+
+  // Listing detail modal
+  const [listingModal, setListingModal] = useState<AdminListing | null>(null);
+  const [listingRejectMode, setListingRejectMode] = useState(false);
+  const [listingRejectReason, setListingRejectReason] = useState("");
+
+  // Seller detail modal
+  const [sellerModal, setSellerModal] = useState<AdminSeller | null>(null);
+  const [sellerModalListings, setSellerModalListings] = useState<AdminListing[]>([]);
+  const [sellerModalLoading, setSellerModalLoading] = useState(false);
 
   const isSuperAdmin = user?.roles?.includes("super_admin");
   const isAdmin = user?.roles?.some(r => ["admin", "super_admin"].includes(r));
@@ -286,15 +307,33 @@ export default function AdminDashboard() {
     try {
       await api.post(`/admin/listings/${id}/publish`);
       setListings(prev => prev.map(l => l.id === id ? { ...l, status: "published" as const } : l));
+      setListingModal(prev => prev?.id === id ? { ...prev, status: "published" as const } : prev);
     } finally { setActionLoading(null); }
   }
 
-  async function rejectListing(id: number) {
+  async function rejectListing(id: number, reason = "") {
     setActionLoading(id);
     try {
-      await api.post(`/admin/listings/${id}/reject`);
+      await api.post(`/admin/listings/${id}/reject`, { reason });
       setListings(prev => prev.map(l => l.id === id ? { ...l, status: "rejected" as const } : l));
+      setListingModal(prev => prev?.id === id ? { ...prev, status: "rejected" as const } : prev);
+      setListingRejectMode(false);
+      setListingRejectReason("");
     } finally { setActionLoading(null); }
+  }
+
+  async function openSellerModal(seller: AdminSeller) {
+    setSellerModal(seller);
+    setSellerModalListings([]);
+    setSellerModalLoading(true);
+    try {
+      const res = await api.get(`/admin/listings?per_page=100&seller_id=${seller.id}`);
+      setSellerModalListings(res.data.data || []);
+    } catch {
+      setSellerModalListings([]);
+    } finally {
+      setSellerModalLoading(false);
+    }
   }
 
   async function createStaff() {
@@ -505,7 +544,7 @@ export default function AdminDashboard() {
                   </h2>
                   <div className="space-y-2">
                     {pendingListings.slice(0, 5).map(l => (
-                      <PendingListingRow key={l.id} listing={l} onPublish={publishListing} onReject={rejectListing} actionLoading={actionLoading} />
+                      <PendingListingRow key={l.id} listing={l} onPublish={publishListing} onReject={rejectListing} actionLoading={actionLoading} onDetail={() => setListingModal(l)} />
                     ))}
                   </div>
                   {pendingListings.length > 5 && (
@@ -671,7 +710,7 @@ export default function AdminDashboard() {
               {listings.length === 0
                 ? <p className="text-center py-12 text-sm" style={{ color: "#8A99AA" }}>Aucune annonce.</p>
                 : listings.map(l => (
-                    <PendingListingRow key={l.id} listing={l} onPublish={publishListing} onReject={rejectListing} actionLoading={actionLoading} showAll />
+                    <PendingListingRow key={l.id} listing={l} onPublish={publishListing} onReject={rejectListing} actionLoading={actionLoading} showAll onDetail={() => setListingModal(l)} />
                   ))
               }
             </div>
@@ -688,12 +727,12 @@ export default function AdminDashboard() {
                 </div>
               ) : expertiseQueue.map(l => (
                 <div key={l.id} className="card p-4 flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0" style={{ background: "#F0EDE8" }}>
+                  <button className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 focus:outline-none" style={{ background: "#F0EDE8" }} onClick={() => setListingModal(l)}>
                     {l.photos?.[0]
                       ? <img src={l.photos[0].url} alt="" className="w-full h-full object-cover" />
                       : <div className="w-full h-full flex items-center justify-center text-xl">📱</div>}
-                  </div>
-                  <div className="flex-1 min-w-0">
+                  </button>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setListingModal(l)}>
                     <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>
                       {l.iphone_model} {l.capacity} Go · {CONDITION_LABELS[l.condition]}
                     </p>
@@ -776,7 +815,7 @@ export default function AdminDashboard() {
                     (s.full_name.toLowerCase().includes(sellerSearch.toLowerCase()) ||
                      s.email.toLowerCase().includes(sellerSearch.toLowerCase()))
                   ).map(s => (
-                  <div key={s.id} className="card p-4">
+                  <div key={s.id} className="card p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => openSellerModal(s)}>
                     <div className="flex items-start gap-3">
                       {/* Avatar */}
                       <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
@@ -851,7 +890,7 @@ export default function AdminDashboard() {
                           <button
                             className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg font-semibold transition-colors"
                             style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}
-                            onClick={() => { setCreditModal({ id: s.id, full_name: s.full_name }); setCreditAmount(1); setCreditMsg(""); }}
+                            onClick={(e) => { e.stopPropagation(); setCreditModal({ id: s.id, full_name: s.full_name }); setCreditAmount(1); setCreditMsg(""); }}
                           >
                             <Gift size={11} /> Créditer
                           </button>
@@ -1315,6 +1354,226 @@ export default function AdminDashboard() {
           )}
         </>
       )}
+      {/* ── MODAL DÉTAIL ANNONCE ── */}
+      {listingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(11,26,43,0.6)", backdropFilter: "blur(6px)" }}
+          onClick={e => e.target === e.currentTarget && (setListingModal(null), setListingRejectMode(false), setListingRejectReason(""))}>
+          <div className="w-full max-w-2xl rounded-2xl relative flex flex-col" style={{ background: "white", boxShadow: "0 24px 80px rgba(0,0,0,0.22)", maxHeight: "92vh" }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-5 pb-3 flex-shrink-0" style={{ borderBottom: "1px solid rgba(11,26,43,0.07)" }}>
+              <div>
+                <h2 className="font-bold text-lg" style={{ color: "#0B1A2B" }}>
+                  {listingModal.iphone_model} {listingModal.capacity} Go · {listingModal.color}
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: "#8A99AA" }}>
+                  {CONDITION_LABELS[listingModal.condition]} · {formatDate(listingModal.created_at)}
+                </p>
+              </div>
+              <button className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(11,26,43,0.06)", color: "#0B1A2B" }}
+                onClick={() => { setListingModal(null); setListingRejectMode(false); setListingRejectReason(""); }}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Scrollable content */}
+            <div className="overflow-y-auto flex-1 p-6 space-y-5">
+              {/* Photos */}
+              {listingModal.photos?.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {listingModal.photos.map((p, i) => (
+                    <img key={i} src={p.url} alt={`Photo ${i + 1}`}
+                      className="h-40 w-40 object-cover rounded-xl flex-shrink-0"
+                      style={{ border: "1px solid rgba(11,26,43,0.08)" }} />
+                  ))}
+                </div>
+              )}
+
+              {/* Price + Plan + Status */}
+              <div className="flex items-center gap-4 flex-wrap">
+                <p className="text-2xl font-bold font-mono" style={{ color: "#0B1A2B" }}>
+                  {formatPrice(listingModal.asking_price)}
+                </p>
+                {listingModal.plan && (
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                    style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
+                    {PLAN_LABELS[listingModal.plan] || listingModal.plan}
+                  </span>
+                )}
+                {(() => {
+                  const s = STATUS_LABELS[listingModal.status];
+                  return s ? <Badge variant={s.variant}>{s.label}</Badge> : null;
+                })()}
+              </div>
+
+              {/* Grid infos */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl p-3" style={{ background: "#F7F5F0" }}>
+                  <p className="text-xs font-medium mb-0.5" style={{ color: "#8A99AA" }}>Vendeur</p>
+                  <p className="text-sm font-semibold" style={{ color: "#0B1A2B" }}>{listingModal.seller?.full_name}</p>
+                </div>
+                {listingModal.whatsapp_number && (
+                  <div className="rounded-xl p-3" style={{ background: "#F7F5F0" }}>
+                    <p className="text-xs font-medium mb-0.5" style={{ color: "#8A99AA" }}>WhatsApp</p>
+                    <p className="text-sm font-semibold font-mono" style={{ color: "#0B1A2B" }}>{listingModal.whatsapp_number}</p>
+                  </div>
+                )}
+                {listingModal.imei && (
+                  <div className="rounded-xl p-3" style={{ background: "#F7F5F0" }}>
+                    <p className="text-xs font-medium mb-0.5" style={{ color: "#8A99AA" }}>IMEI</p>
+                    <p className="text-sm font-mono" style={{ color: "#0B1A2B" }}>{listingModal.imei}</p>
+                  </div>
+                )}
+                <div className="rounded-xl p-3" style={{ background: "#F7F5F0" }}>
+                  <p className="text-xs font-medium mb-0.5" style={{ color: "#8A99AA" }}>Paiement</p>
+                  <p className="text-sm font-semibold" style={{ color: listingModal.payment_status === "paid" ? "#00B070" : "#B8860B" }}>
+                    {listingModal.payment_status === "paid" ? "Payé ✓" : "En attente"}
+                  </p>
+                </div>
+              </div>
+
+              {listingModal.description && (
+                <div>
+                  <p className="text-xs font-medium mb-1" style={{ color: "#8A99AA" }}>Description</p>
+                  <p className="text-sm leading-relaxed" style={{ color: "#0B1A2B" }}>{listingModal.description}</p>
+                </div>
+              )}
+
+              {/* Actions */}
+              {["pending_expertise", "under_expertise"].includes(listingModal.status) && (
+                <div className="pt-4" style={{ borderTop: "1px solid rgba(11,26,43,0.07)" }}>
+                  {listingRejectMode ? (
+                    <div className="space-y-3">
+                      <label className="text-sm font-semibold block" style={{ color: "#0B1A2B" }}>Motif du rejet *</label>
+                      <textarea className="input w-full resize-none" rows={3}
+                        placeholder="Ex: Photos insuffisantes, IMEI suspect, état non conforme…"
+                        value={listingRejectReason}
+                        onChange={e => setListingRejectReason(e.target.value)} />
+                      <div className="flex gap-2">
+                        <button onClick={() => { setListingRejectMode(false); setListingRejectReason(""); }}
+                          className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                          style={{ background: "rgba(11,26,43,0.08)", color: "#0B1A2B" }}>
+                          Annuler
+                        </button>
+                        <Button className="flex-1" loading={actionLoading === listingModal.id}
+                          onClick={() => rejectListing(listingModal.id, listingRejectReason)}
+                          style={{ background: "#CC0000" }}>
+                          <XCircle size={14} /> Confirmer le rejet
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-3">
+                      <Button className="flex-1" loading={actionLoading === listingModal.id}
+                        onClick={() => publishListing(listingModal.id)}>
+                        <CheckCircle size={15} /> Valider l&apos;annonce
+                      </Button>
+                      <button onClick={() => setListingRejectMode(true)}
+                        className="flex-1 py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                        style={{ background: "rgba(204,0,0,0.08)", color: "#CC0000" }}>
+                        <XCircle size={15} /> Refuser
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL DÉTAIL VENDEUR ── */}
+      {sellerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(11,26,43,0.6)", backdropFilter: "blur(6px)" }}
+          onClick={e => e.target === e.currentTarget && setSellerModal(null)}>
+          <div className="w-full max-w-2xl rounded-2xl relative flex flex-col" style={{ background: "white", boxShadow: "0 24px 80px rgba(0,0,0,0.22)", maxHeight: "92vh" }}>
+            {/* Header */}
+            <div className="flex items-start justify-between px-6 pt-5 pb-4 flex-shrink-0" style={{ borderBottom: "1px solid rgba(11,26,43,0.07)" }}>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0"
+                  style={{ background: "#0B1A2B", color: "#00D084" }}>
+                  {sellerModal.full_name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold" style={{ color: "#0B1A2B" }}>{sellerModal.full_name}</p>
+                    {sellerModal.kyc_status === "approved" && (
+                      <span className="flex items-center gap-0.5 text-xs font-semibold" style={{ color: "#00B070" }}>
+                        <UserCheck size={11} /> KYC ✓
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm" style={{ color: "#8A99AA" }}>{sellerModal.email}</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#8A99AA" }}>Inscrit le {formatDate(sellerModal.created_at)}</p>
+                </div>
+              </div>
+              <button className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(11,26,43,0.06)", color: "#0B1A2B" }}
+                onClick={() => setSellerModal(null)}>
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Stats */}
+            <div className="grid grid-cols-4 gap-0 flex-shrink-0" style={{ borderBottom: "1px solid rgba(11,26,43,0.07)" }}>
+              {[
+                { label: "Dépensés",   value: formatPrice(sellerModal.total_spent), color: "#00B070" },
+                { label: "En ligne",   value: sellerModal.active,                   color: "#0B1A2B" },
+                { label: "Vendus",     value: sellerModal.sold,                     color: "#0B1A2B" },
+                { label: "Crédits",    value: sellerModal.listing_credits,          color: "#F59E0B" },
+              ].map((s, i) => (
+                <div key={i} className="text-center py-3 px-2" style={{ borderRight: i < 3 ? "1px solid rgba(11,26,43,0.07)" : "none" }}>
+                  <p className="font-bold text-base font-mono" style={{ color: s.color }}>{s.value}</p>
+                  <p className="text-xs" style={{ color: "#8A99AA" }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Listings */}
+            <div className="overflow-y-auto flex-1 p-5">
+              <h3 className="font-semibold text-sm mb-3" style={{ color: "#0B1A2B" }}>
+                Annonces ({sellerModalLoading ? "…" : sellerModalListings.length})
+              </h3>
+              {sellerModalLoading ? (
+                <div className="space-y-2">
+                  {[1,2,3].map(i => <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: "#E8E4DF" }} />)}
+                </div>
+              ) : sellerModalListings.length === 0 ? (
+                <p className="text-sm text-center py-8" style={{ color: "#8A99AA" }}>Aucune annonce.</p>
+              ) : (
+                <div className="space-y-2">
+                  {sellerModalListings.map(l => {
+                    const s = STATUS_LABELS[l.status] ?? { label: l.status, variant: "ink" as const };
+                    return (
+                      <div key={l.id} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-gray-50"
+                        style={{ border: "1px solid rgba(11,26,43,0.07)" }}
+                        onClick={() => { setSellerModal(null); setListingModal(l); }}>
+                        <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0" style={{ background: "#F0EDE8" }}>
+                          {l.photos?.[0]
+                            ? <img src={l.photos[0].url} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-sm">📱</div>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate" style={{ color: "#0B1A2B" }}>
+                            {l.iphone_model} {l.capacity} Go · {l.color}
+                          </p>
+                          <p className="text-xs" style={{ color: "#8A99AA" }}>
+                            {formatDate(l.created_at)} · {formatPrice(l.asking_price)}
+                          </p>
+                        </div>
+                        <Badge variant={s.variant}>{s.label}</Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL PRÉVISUALISATION DOCUMENT KYC ── */}
       {kycPreview && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -1447,36 +1706,28 @@ export default function AdminDashboard() {
 
 // ─── Composant ligne annonce ──────────────────────────────────────────────────
 function PendingListingRow({
-  listing, onPublish, onReject, actionLoading, showAll = false,
+  listing, onPublish, onReject, actionLoading, showAll = false, onDetail,
 }: {
   listing: AdminListing;
   onPublish: (id: number) => void;
-  onReject: (id: number) => void;
+  onReject: (id: number, reason?: string) => void;
   actionLoading: number | null;
   showAll?: boolean;
+  onDetail?: () => void;
 }) {
-  const STATUS_MAP: Record<string, { label: string; variant: "signal" | "ink" | "warning" | "error" }> = {
-    pending_expertise: { label: "En attente", variant: "warning" },
-    under_expertise:   { label: "En cours",   variant: "warning" },
-    published:         { label: "Publiée",    variant: "signal" },
-    rejected:          { label: "Refusée",    variant: "error" },
-    sold:              { label: "Vendue",     variant: "ink" },
-    unpublished:       { label: "Dépubliée",  variant: "ink" },
-    draft:             { label: "À payer",    variant: "error" },
-  };
-  const s = STATUS_MAP[listing.status] ?? { label: listing.status, variant: "ink" as const };
+  const s = STATUS_LABELS[listing.status] ?? { label: listing.status, variant: "ink" as const };
   const isPending = ["pending_expertise", "under_expertise"].includes(listing.status);
 
   if (!showAll && !isPending) return null;
 
   return (
     <div className="card p-4 flex items-center gap-4">
-      <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0" style={{ background: "#F0EDE8" }}>
+      <button className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 focus:outline-none" style={{ background: "#F0EDE8" }} onClick={onDetail}>
         {listing.photos?.[0]
           ? <img src={listing.photos[0].url} alt="" className="w-full h-full object-cover" />
           : <div className="w-full h-full flex items-center justify-center text-lg">📱</div>}
-      </div>
-      <div className="flex-1 min-w-0">
+      </button>
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onDetail}>
         <p className="font-semibold text-sm truncate" style={{ color: "#0B1A2B" }}>
           {listing.iphone_model} {listing.capacity} Go · {listing.color}
         </p>

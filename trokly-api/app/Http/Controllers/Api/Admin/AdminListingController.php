@@ -11,7 +11,7 @@ class AdminListingController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $query = Listing::with(['seller:id,full_name,phone_number', 'photos' => fn($q) => $q->limit(1)]);
+        $query = Listing::with(['seller:id,full_name,email,phone_number', 'photos']);
 
         if ($request->status) {
             $query->where('status', $request->status);
@@ -21,6 +21,10 @@ class AdminListingController extends Controller
             $query->where('sale_type', $request->sale_type);
         }
 
+        if ($request->seller_id) {
+            $query->where('seller_id', $request->seller_id);
+        }
+
         if ($request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('iphone_model', 'ilike', "%{$request->search}%")
@@ -28,7 +32,8 @@ class AdminListingController extends Controller
             });
         }
 
-        return response()->json($query->orderBy('created_at', 'desc')->paginate(20));
+        $perPage = min((int)($request->per_page ?? 20), 200);
+        return response()->json($query->orderBy('created_at', 'desc')->paginate($perPage));
     }
 
     public function publish(Listing $listing): JsonResponse
@@ -44,7 +49,7 @@ class AdminListingController extends Controller
 
     public function reject(Request $request, Listing $listing): JsonResponse
     {
-        $request->validate(['reason' => 'required|string']);
+        $request->validate(['reason' => 'nullable|string']);
 
         $listing->update(['status' => 'rejected']);
 
