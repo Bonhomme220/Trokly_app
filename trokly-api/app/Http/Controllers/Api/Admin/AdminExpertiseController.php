@@ -139,7 +139,7 @@ class AdminExpertiseController extends Controller
                 'sale_date'        => today(),
             ]);
 
-            $appUrl = config('app.url', 'https://trokly-web.onrender.com');
+            $appUrl = config('app.url', 'https://trokly.bj');
             app(NotificationService::class)->listingPublished(
                 $listing->seller,
                 "{$listing->iphone_model} {$listing->capacity}Go",

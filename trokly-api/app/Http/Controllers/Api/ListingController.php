@@ -140,7 +140,7 @@ class ListingController extends Controller
             }
 
             // Générer le lien de paiement
-            $frontUrl  = config('app.frontend_url', 'https://trokly-web.onrender.com');
+            $frontUrl  = config('app.frontend_url', 'https://trokly.bj');
             $returnUrl = "{$frontUrl}/listings/payment/success?listing_id={$listing->id}";
             $cancelUrl = "{$frontUrl}/listings/payment/cancel?listing_id={$listing->id}";
 

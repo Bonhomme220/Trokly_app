@@ -71,7 +71,7 @@ class TradeController extends Controller
             ]);
         }
 
-        $appUrl = config('app.url', 'https://trokly-web.onrender.com');
+        $appUrl = config('app.url', 'https://trokly.bj');
         app(NotificationService::class)->tradeProposalReceived(
             $listing->seller,
             $request->user()->full_name,
@@ -156,7 +156,7 @@ class TradeController extends Controller
 
         // Notifier l'autre partie
         $recipient = $user->id === $trade->initiator_id ? $trade->listing->seller : $trade->initiator;
-        $appUrl    = config('app.url', 'https://trokly-web.onrender.com');
+        $appUrl    = config('app.url', 'https://trokly.bj');
         app(NotificationService::class)->tradeOfferReceived(
             $recipient,
             $user->full_name,
@@ -181,7 +181,7 @@ class TradeController extends Controller
 
         // Notifier les deux parties avec les infos de l'expert partenaire
         $expertProfile = ExpertProfile::where('is_active', true)->inRandomOrder()->first();
-        $appUrl        = config('app.url', 'https://trokly-web.onrender.com');
+        $appUrl        = config('app.url', 'https://trokly.bj');
         $tradeUrl      = "{$appUrl}/trades/{$trade->id}";
 
         $initiator = $trade->initiator;

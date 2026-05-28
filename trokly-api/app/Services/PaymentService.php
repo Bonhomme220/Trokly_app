@@ -25,7 +25,7 @@ class PaymentService
     {
         $amount      = self::totalPrice($listing->plan, $listing->is_boosted);
         $callbackUrl = rtrim(config('app.url'), '/') . '/api/payments/webhook';
-        $frontUrl    = rtrim(config('app.frontend_url', 'https://trokly-web.onrender.com'), '/');
+        $frontUrl    = rtrim(config('app.frontend_url', 'https://trokly.bj'), '/');
 
         $planLabel = match ($listing->plan) {
             'basic'           => 'Annonce simple',
