@@ -322,6 +322,15 @@ export default function AdminDashboard() {
     } finally { setActionLoading(null); }
   }
 
+  async function unpublishListing(id: number) {
+    setActionLoading(id);
+    try {
+      await api.post(`/admin/listings/${id}/unpublish`);
+      setListings(prev => prev.map(l => l.id === id ? { ...l, status: "unpublished" as const } : l));
+      setListingModal(prev => prev?.id === id ? { ...prev, status: "unpublished" as const } : prev);
+    } finally { setActionLoading(null); }
+  }
+
   async function openSellerModal(seller: AdminSeller) {
     setSellerModal(seller);
     setSellerModalListings([]);
@@ -1437,6 +1446,20 @@ export default function AdminDashboard() {
                 <div>
                   <p className="text-xs font-medium mb-1" style={{ color: "#8A99AA" }}>Description</p>
                   <p className="text-sm leading-relaxed" style={{ color: "#0B1A2B" }}>{listingModal.description}</p>
+                </div>
+              )}
+
+              {/* Dépublier */}
+              {listingModal.status === "published" && (
+                <div className="pt-4" style={{ borderTop: "1px solid rgba(11,26,43,0.07)" }}>
+                  <button
+                    disabled={actionLoading === listingModal.id}
+                    onClick={() => unpublishListing(listingModal.id)}
+                    className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+                    style={{ background: "rgba(184,134,11,0.08)", color: "#B8860B" }}>
+                    <Ban size={15} />
+                    {actionLoading === listingModal.id ? "…" : "Dépublier l'annonce"}
+                  </button>
                 </div>
               )}
 

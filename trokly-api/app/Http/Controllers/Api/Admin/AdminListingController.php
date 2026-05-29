@@ -47,6 +47,17 @@ class AdminListingController extends Controller
         return response()->json(['message' => 'Annonce publiée.']);
     }
 
+    public function unpublish(Listing $listing): JsonResponse
+    {
+        if ($listing->status !== 'published') {
+            return response()->json(['message' => 'Seules les annonces publiées peuvent être dépubliées.'], 422);
+        }
+
+        $listing->update(['status' => 'unpublished']);
+
+        return response()->json(['message' => 'Annonce dépubliée.']);
+    }
+
     public function reject(Request $request, Listing $listing): JsonResponse
     {
         $request->validate(['reason' => 'nullable|string']);

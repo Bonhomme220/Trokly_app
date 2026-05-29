@@ -129,6 +129,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Annonces
         Route::get('listings', [AdminListingController::class, 'index']);
         Route::post('listings/{listing}/publish', [AdminListingController::class, 'publish']);
+        Route::post('listings/{listing}/unpublish', [AdminListingController::class, 'unpublish']);
         Route::post('listings/{listing}/reject', [AdminListingController::class, 'reject']);
         Route::delete('listings/{listing}', [AdminListingController::class, 'destroy']);
 
