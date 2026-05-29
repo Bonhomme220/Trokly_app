@@ -53,6 +53,7 @@ export default function HomePage() {
     condition: "" as Condition | "",
     capacity: "",
     max_price: "",
+    plan: "",
   });
 
   async function fetchListings(p = 1, replace = true, overrideModel?: string) {
@@ -64,6 +65,7 @@ export default function HomePage() {
       if (filters.condition) params.condition = filters.condition;
       if (filters.capacity) params.capacity = filters.capacity;
       if (filters.max_price) params.max_price = filters.max_price;
+      if (filters.plan) params.plan = filters.plan;
 
       const res = await api.get<PaginatedResponse<Listing>>("/listings", { params });
       if (replace) setListings(res.data.data);
@@ -86,7 +88,7 @@ export default function HomePage() {
   }
 
   function resetFilters() {
-    setFilters({ model: "", condition: "", capacity: "", max_price: "" });
+    setFilters({ model: "", condition: "", capacity: "", max_price: "", plan: "" });
     setActiveSeries("");
   }
 
@@ -99,7 +101,7 @@ export default function HomePage() {
   }
 
   const activeFilterCount = [
-    filters.model, filters.condition, filters.capacity, filters.max_price,
+    filters.model, filters.condition, filters.capacity, filters.max_price, filters.plan,
   ].filter(Boolean).length;
 
   const filteredBySearch = search.trim()
@@ -285,6 +287,15 @@ export default function HomePage() {
                   </select>
                 </div>
                 <div>
+                  <label className="text-xs font-semibold block mb-1.5" style={{ color: "#8A99AA" }}>Badge</label>
+                  <select className="input text-sm" value={filters.plan} onChange={(e) => setFilters({ ...filters, plan: e.target.value })}>
+                    <option value="">Tous les badges</option>
+                    <option value="verified_seller">Vendeur vérifié</option>
+                    <option value="verified_phone">iPhone vérifié</option>
+                    <option value="basic">Sans badge</option>
+                  </select>
+                </div>
+                <div>
                   <label className="text-xs font-semibold block mb-1.5" style={{ color: "#8A99AA" }}>État</label>
                   <select className="input text-sm" value={filters.condition} onChange={(e) => setFilters({ ...filters, condition: e.target.value as Condition | "" })}>
                     <option value="">Tous les états</option>
@@ -318,6 +329,12 @@ export default function HomePage() {
               {filters.model && (
                 <span className="badge badge-ink flex items-center gap-1">{filters.model}
                   <button onClick={() => { setFilters({ ...filters, model: "" }); setActiveSeries(""); }}><X size={11} /></button>
+                </span>
+              )}
+              {filters.plan && (
+                <span className="badge badge-ink flex items-center gap-1">
+                  {filters.plan === "verified_seller" ? "Vendeur vérifié" : filters.plan === "verified_phone" ? "iPhone vérifié" : "Sans badge"}
+                  <button onClick={() => setFilters({ ...filters, plan: "" })}><X size={11} /></button>
                 </span>
               )}
               {filters.condition && (
