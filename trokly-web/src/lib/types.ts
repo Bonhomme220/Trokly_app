@@ -25,7 +25,7 @@ export interface User {
 export interface Kyc {
   id: number;
   user_id: number;
-  document_type: "cni" | "passport" | "permis";
+  document_type: "cni" | "cip" | "passport" | "permis";
   document_url: string;
   status: "pending" | "approved" | "rejected";
   rejection_reason?: string;

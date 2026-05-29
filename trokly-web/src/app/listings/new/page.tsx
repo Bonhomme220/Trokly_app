@@ -107,7 +107,7 @@ export default function NewListingPage() {
   const basePrice = selectedPlan.price + (boosted ? 500 : 0);
   const discountAmount = ambassadorInfo ? Math.round(basePrice * ambassadorInfo.discount_percent / 100) : 0;
   const totalPrice = basePrice - discountAmount;
-  const hasCredit = (user?.listing_credits ?? 0) > 0;
+  const hasCredit = (user?.listing_credits ?? 0) > 0 && plan === "basic";
 
   async function applyAmbassadorCode() {
     const code = ambassadorCode.trim().toUpperCase();
@@ -390,7 +390,13 @@ export default function NewListingPage() {
           {hasCredit && (
             <div className="mt-3 p-3 rounded-xl flex items-center gap-2 text-xs font-medium"
               style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
-              🎁 Vous avez {user?.listing_credits} crédit{(user?.listing_credits ?? 0) > 1 ? "s" : ""} de republication — paiement offert pour cette annonce.
+              🎁 Vous avez {user?.listing_credits} crédit{(user?.listing_credits ?? 0) > 1 ? "s" : ""} de publication — paiement offert pour cette annonce.
+            </div>
+          )}
+          {(user?.listing_credits ?? 0) > 0 && plan !== "basic" && (
+            <div className="mt-3 p-3 rounded-xl flex items-center gap-2 text-xs font-medium"
+              style={{ background: "rgba(245,158,11,0.1)", color: "#B8860B" }}>
+              🎁 Vos crédits de publication s&apos;appliquent uniquement au plan <strong>Basic (499 FCFA)</strong>.
             </div>
           )}
         </div>

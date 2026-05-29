@@ -82,7 +82,8 @@ export default function KycPage() {
       <div>
         <label className="text-sm font-medium block mb-1.5" style={{ color: "#0B1A2B" }}>Type de document</label>
         <select className="input" value={documentType} onChange={e => setDocumentType(e.target.value)}>
-          <option value="cni">Carte Nationale d'Identité</option>
+          <option value="cni">Carte Nationale d'Identité (CNI)</option>
+          <option value="cip">Certificat d'Identification Personnelle (CIP)</option>
           <option value="passport">Passeport</option>
           <option value="permis">Permis de conduire</option>
         </select>

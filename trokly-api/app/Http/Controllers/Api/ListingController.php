@@ -96,9 +96,9 @@ class ListingController extends Controller
         $seller = $request->user();
 
         return DB::transaction(function () use ($request, $seller) {
-            // Utiliser un crédit si disponible — dans la transaction pour rollback auto si echec
+            // Utiliser un crédit uniquement pour le plan basic (499 FCFA)
             $usedCredit = false;
-            if ($seller->listing_credits > 0) {
+            if ($seller->listing_credits > 0 && $request->plan === 'basic') {
                 $seller->decrement('listing_credits');
                 $usedCredit = true;
             }
