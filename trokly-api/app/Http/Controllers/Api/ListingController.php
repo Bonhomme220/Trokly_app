@@ -118,6 +118,7 @@ class ListingController extends Controller
                 'sale_type'       => 'marketplace',
                 'accepts_trade'   => false,
                 'payment_status'  => $usedCredit ? 'paid' : 'pending_payment',
+                'paid_via_credit' => $usedCredit,
                 'status'          => $usedCredit ? ($request->plan === 'basic' ? 'published' : 'pending_expertise') : 'draft',
                 'expires_at'      => $usedCredit ? now()->addDays(30) : null,
             ]);

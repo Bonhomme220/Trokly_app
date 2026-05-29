@@ -63,13 +63,14 @@ interface AdminListing extends Listing {
 
 interface AdminStats {
   revenue: { total: number; period: number; period_days: number };
+  credits: { total_used: number; period_used: number; value_total: number; value_period: number };
   plans: {
     basic: { count: number; revenue: number };
     verified_phone: { count: number; revenue: number };
     verified_seller: { count: number; revenue: number };
   };
   boosts: { count: number; revenue: number };
-  listings: { total: number; paid: number; published: number; pending_expertise: number; sold: number; draft: number };
+  listings: { total: number; paid: number; paid_real: number; paid_credit: number; published: number; pending_expertise: number; sold: number; draft: number };
   sellers: { total: number; new_this_month: number };
   chart: Array<{ date: string; label: string; revenue: number; listings: number }>;
 }
@@ -85,6 +86,7 @@ interface AdminSeller {
   active: number;
   sold: number;
   total_spent: number;
+  credits_used: number;
   listing_credits: number;
   plans: { basic: number; verified_phone: number; verified_seller: number };
 }
@@ -600,9 +602,9 @@ export default function AdminDashboard() {
                   {/* KPI cards */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {[
-                      { label: "CA total",             value: formatPrice(stats.revenue.total),  color: "#00B070", sub: "Depuis le début" },
+                      { label: "CA total",             value: formatPrice(stats.revenue.total),  color: "#00B070", sub: "Paiements réels uniquement" },
                       { label: `CA sur ${stats.revenue.period_days}j`, value: formatPrice(stats.revenue.period), color: "#00D084", sub: "Période sélectionnée" },
-                      { label: "Annonces payées",      value: stats.listings.paid,               color: "#0B1A2B", sub: "Toutes périodes" },
+                      { label: "Annonces payées",      value: stats.listings.paid_real,          color: "#0B1A2B", sub: `+ ${stats.listings.paid_credit} via crédit` },
                       { label: "Vendeurs actifs",      value: stats.sellers.total,               color: "#0B1A2B", sub: `+${stats.sellers.new_this_month} ce mois` },
                     ].map(({ label, value, color, sub }) => (
                       <div key={label} className="card p-4">
@@ -612,6 +614,32 @@ export default function AdminDashboard() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Credits banner */}
+                  {stats.credits && stats.credits.total_used > 0 && (
+                    <div className="rounded-2xl p-4 flex items-center gap-4"
+                      style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: "rgba(245,158,11,0.15)" }}>
+                        <Gift size={18} style={{ color: "#F59E0B" }} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold" style={{ color: "#0B1A2B" }}>
+                          Annonces publiées via crédit — <span style={{ color: "#F59E0B" }}>hors CA</span>
+                        </p>
+                        <p className="text-xs mt-0.5" style={{ color: "#8A99AA" }}>
+                          {stats.credits.total_used} annonce{stats.credits.total_used !== 1 ? "s" : ""} au total
+                          {" · "}{stats.credits.period_used} sur les {stats.revenue.period_days} derniers jours
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-bold font-mono text-sm" style={{ color: "#F59E0B" }}>
+                          {formatPrice(stats.credits.value_total)}
+                        </p>
+                        <p className="text-xs" style={{ color: "#8A99AA" }}>valeur offerte</p>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Chart */}
                   <div className="card p-6">
@@ -638,7 +666,7 @@ export default function AdminDashboard() {
                       <div className="space-y-3">
                         {(["basic", "verified_phone", "verified_seller"] as const).map(plan => {
                           const p = stats.plans[plan];
-                          const total = stats.listings.paid || 1;
+                          const total = stats.listings.paid_real || 1;
                           const pct = Math.round((p.count / total) * 100);
                           return (
                             <div key={plan}>
@@ -890,6 +918,12 @@ export default function AdminDashboard() {
                         </div>
                         {/* Crédits + bouton */}
                         <div className="flex items-center justify-end gap-2 mt-1.5">
+                          {s.credits_used > 0 && (
+                            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold"
+                              style={{ background: "rgba(245,158,11,0.08)", color: "#B8860B" }}>
+                              <Gift size={10} /> {s.credits_used} utilisé{s.credits_used > 1 ? "s" : ""}
+                            </span>
+                          )}
                           {s.listing_credits > 0 && (
                             <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold"
                               style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
@@ -1437,7 +1471,9 @@ export default function AdminDashboard() {
                 <div className="rounded-xl p-3" style={{ background: "#F7F5F0" }}>
                   <p className="text-xs font-medium mb-0.5" style={{ color: "#8A99AA" }}>Paiement</p>
                   <p className="text-sm font-semibold" style={{ color: listingModal.payment_status === "paid" ? "#00B070" : "#B8860B" }}>
-                    {listingModal.payment_status === "paid" ? "Payé ✓" : "En attente"}
+                    {listingModal.payment_status === "paid"
+                      ? ((listingModal as AdminListing & { paid_via_credit?: boolean }).paid_via_credit ? "Via crédit 🎁" : "Payé ✓")
+                      : "En attente"}
                   </p>
                 </div>
               </div>

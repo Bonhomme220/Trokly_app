@@ -27,6 +27,7 @@ class Listing extends Model
         'whatsapp_number',
         'expires_at',
         'payment_status',
+        'paid_via_credit',
         'payment_reference',
         'sold_at',
         'quality_grade',
@@ -37,8 +38,9 @@ class Listing extends Model
     protected function casts(): array
     {
         return [
-            'accepts_trade'  => 'boolean',
-            'is_boosted'     => 'boolean',
+            'accepts_trade'   => 'boolean',
+            'is_boosted'      => 'boolean',
+            'paid_via_credit' => 'boolean',
             'asking_price'   => 'integer',
             'ai_suggested_price' => 'integer',
             'retail_price'   => 'integer',

@@ -38,29 +38,34 @@ class AdminDashboardController extends Controller
 
         // All paid listings (lightweight query)
         $allPaid = Listing::where('payment_status', 'paid')
-            ->select('id', 'plan', 'is_boosted', 'status', 'seller_id', 'updated_at')
+            ->select('id', 'plan', 'is_boosted', 'status', 'seller_id', 'paid_via_credit', 'updated_at')
             ->get();
 
-        // Period subset
-        $periodPaid = $allPaid->filter(fn($l) => $l->updated_at >= $from);
+        // Split: real payments vs credit-published
+        $allReal   = $allPaid->where('paid_via_credit', false);
+        $allCredit = $allPaid->where('paid_via_credit', true);
+
+        // Period subsets
+        $periodReal   = $allReal->filter(fn($l) => $l->updated_at >= $from);
+        $periodCredit = $allCredit->filter(fn($l) => $l->updated_at >= $from);
 
         $calcRevenue = fn($col) => $col->sum(
             fn($l) => (self::PLAN_PRICES[$l->plan] ?? 0) + ($l->is_boosted ? 500 : 0)
         );
 
-        // Plan breakdown (all-time)
+        // Plan breakdown (all-time, real payments only)
         $plans = [];
         foreach (self::PLAN_PRICES as $plan => $price) {
-            $count = $allPaid->where('plan', $plan)->count();
+            $count = $allReal->where('plan', $plan)->count();
             $plans[$plan] = ['count' => $count, 'revenue' => $count * $price];
         }
-        $boostCount = $allPaid->where('is_boosted', true)->count();
+        $boostCount = $allReal->where('is_boosted', true)->count();
 
-        // Daily chart data for the period
+        // Daily chart data for the period (real payments only)
         $chart = [];
         for ($i = $days - 1; $i >= 0; $i--) {
             $date = now()->subDays($i)->format('Y-m-d');
-            $dayItems = $periodPaid->filter(fn($l) => $l->updated_at->format('Y-m-d') === $date);
+            $dayItems = $periodReal->filter(fn($l) => $l->updated_at->format('Y-m-d') === $date);
             $chart[] = [
                 'date'     => $date,
                 'label'    => now()->subDays($i)->format('d/m'),
@@ -71,15 +76,23 @@ class AdminDashboardController extends Controller
 
         return response()->json([
             'revenue' => [
-                'total'       => (int) $calcRevenue($allPaid),
-                'period'      => (int) $calcRevenue($periodPaid),
+                'total'       => (int) $calcRevenue($allReal),
+                'period'      => (int) $calcRevenue($periodReal),
                 'period_days' => $days,
+            ],
+            'credits' => [
+                'total_used'    => $allCredit->count(),
+                'period_used'   => $periodCredit->count(),
+                'value_total'   => (int) $calcRevenue($allCredit),
+                'value_period'  => (int) $calcRevenue($periodCredit),
             ],
             'plans'  => $plans,
             'boosts' => ['count' => $boostCount, 'revenue' => $boostCount * 500],
             'listings' => [
                 'total'             => Listing::count(),
                 'paid'              => $allPaid->count(),
+                'paid_real'         => $allReal->count(),
+                'paid_credit'       => $allCredit->count(),
                 'published'         => Listing::where('status', 'published')->count(),
                 'pending_expertise' => Listing::where('status', 'pending_expertise')->count(),
                 'sold'              => Listing::where('status', 'sold')->count(),
@@ -100,15 +113,17 @@ class AdminDashboardController extends Controller
         $users = User::with([
             'kyc:id,user_id,status',
             'listings' => fn($q) => $q->where('payment_status', 'paid')
-                ->select('id', 'seller_id', 'plan', 'is_boosted', 'status'),
+                ->select('id', 'seller_id', 'plan', 'is_boosted', 'status', 'paid_via_credit'),
         ])
         ->withCount('listings as total_listings')
         ->orderByDesc('created_at')
         ->paginate(50);
 
         $users->through(function ($user) {
-            $paid = $user->listings;
-            $totalSpent = $paid->sum(
+            $paid       = $user->listings;
+            $paidReal   = $paid->where('paid_via_credit', false);
+            $paidCredit = $paid->where('paid_via_credit', true);
+            $totalSpent = $paidReal->sum(
                 fn($l) => (self::PLAN_PRICES[$l->plan] ?? 0) + ($l->is_boosted ? 500 : 0)
             );
 
@@ -119,15 +134,16 @@ class AdminDashboardController extends Controller
                 'created_at'     => $user->created_at,
                 'is_active'      => $user->is_active,
                 'kyc_status'     => $user->kyc?->status,
-                'listings_count' => $paid->count(),
-                'active'         => $paid->where('status', 'published')->count(),
-                'sold'           => $paid->where('status', 'sold')->count(),
-                'total_spent'    => $totalSpent,
+                'listings_count'  => $paid->count(),
+                'active'          => $paid->where('status', 'published')->count(),
+                'sold'            => $paid->where('status', 'sold')->count(),
+                'total_spent'     => $totalSpent,
+                'credits_used'    => $paidCredit->count(),
                 'listing_credits' => $user->listing_credits,
                 'plans' => [
-                    'basic'           => $paid->where('plan', 'basic')->count(),
-                    'verified_phone'  => $paid->where('plan', 'verified_phone')->count(),
-                    'verified_seller' => $paid->where('plan', 'verified_seller')->count(),
+                    'basic'           => $paidReal->where('plan', 'basic')->count(),
+                    'verified_phone'  => $paidReal->where('plan', 'verified_phone')->count(),
+                    'verified_seller' => $paidReal->where('plan', 'verified_seller')->count(),
                 ],
             ];
         });
