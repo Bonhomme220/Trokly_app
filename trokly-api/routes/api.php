@@ -71,6 +71,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Mes annonces
     Route::get('my/listings', [ListingController::class, 'myListings']);
+    Route::get('my/listings/{listing}', [ListingController::class, 'showMine']);
+    Route::post('listings/{listing}/republish', [ListingController::class, 'republish']);
     Route::get('my/purchases', [TransactionController::class, 'myPurchases']);
     Route::get('my/sales', [TransactionController::class, 'mySales']);
 

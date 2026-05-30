@@ -117,7 +117,7 @@ class AdminDashboardController extends Controller
         ])
         ->withCount('listings as total_listings')
         ->orderByDesc('created_at')
-        ->paginate(50);
+        ->paginate(min((int) $request->get('per_page', 50), 200));
 
         $users->through(function ($user) {
             $paid       = $user->listings;

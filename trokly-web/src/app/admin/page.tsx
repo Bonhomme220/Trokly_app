@@ -13,9 +13,10 @@ import {
   CheckCircle, XCircle, ShoppingBag, Users, Clock,
   Ban, UserCheck, UserPlus, Shield,
   BadgeCheck, Zap, Gift, X, Tag, Wallet, ArrowDownCircle, FileCheck,
+  CreditCard, ExternalLink,
 } from "lucide-react";
 
-type Tab = "overview" | "revenue" | "listings" | "expertises" | "sellers" | "staff" | "ambassadors" | "kyc";
+type Tab = "overview" | "revenue" | "listings" | "expertises" | "sellers" | "staff" | "ambassadors" | "kyc" | "payments";
 
 interface KycUser {
   id: number;
@@ -89,6 +90,19 @@ interface AdminSeller {
   credits_used: number;
   listing_credits: number;
   plans: { basic: number; verified_phone: number; verified_seller: number };
+}
+
+interface AdminTransaction {
+  id: number;
+  listing?: { id: number; iphone_model: string; capacity: number };
+  buyer?: { id: number; full_name: string; phone_number: string };
+  seller?: { id: number; full_name: string; phone_number: string };
+  amount: number;
+  commission: number;
+  seller_net: number;
+  status: "pending" | "in_retraction" | "completed" | "refunded" | "litigated";
+  payment_reference?: string;
+  created_at: string;
 }
 
 // ─── Mini bar chart (no dependency) ──────────────────────────────────────────
@@ -219,6 +233,23 @@ export default function AdminDashboard() {
   const [creditLoading, setCreditLoading] = useState(false);
   const [creditMsg, setCreditMsg] = useState("");
 
+  // Payments / transactions
+  const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
+  const [txFilter, setTxFilter] = useState<"" | "pending" | "completed" | "litigated">("");
+
+  // Expertise queue memory (listings treated during this session)
+  const [treatedExpertiseIds, setTreatedExpertiseIds] = useState<Set<number>>(new Set());
+
+  // Pagination — listings tab
+  const [listingsPage, setListingsPage] = useState(1);
+  const [listingsLastPage, setListingsLastPage] = useState(1);
+  const [listingsLoadingMore, setListingsLoadingMore] = useState(false);
+
+  // Pagination — sellers tab
+  const [sellersPage, setSellersPage] = useState(1);
+  const [sellersLastPage, setSellersLastPage] = useState(1);
+  const [sellersLoadingMore, setSellersLoadingMore] = useState(false);
+
   // Listing detail modal
   const [listingModal, setListingModal] = useState<AdminListing | null>(null);
   const [listingRejectMode, setListingRejectMode] = useState(false);
@@ -270,12 +301,19 @@ export default function AdminDashboard() {
         setListings(lstRes.data.data || []);
       } else if (tab === "revenue") {
         await loadStats(statsDays);
-      } else if (tab === "listings" || tab === "expertises") {
+      } else if (tab === "expertises") {
         const res = await api.get("/admin/listings?per_page=100");
         setListings(res.data.data || []);
+      } else if (tab === "listings") {
+        const res = await api.get("/admin/listings?per_page=20&page=1");
+        setListings(res.data.data || []);
+        setListingsPage(res.data.current_page || 1);
+        setListingsLastPage(res.data.last_page || 1);
       } else if (tab === "sellers") {
-        const res = await api.get("/admin/sellers").catch(() => ({ data: { data: [] } }));
+        const res = await api.get("/admin/sellers?per_page=20").catch(() => ({ data: { data: [], current_page: 1, last_page: 1 } }));
         setSellers(res.data.data || []);
+        setSellersPage(res.data.current_page || 1);
+        setSellersLastPage(res.data.last_page || 1);
       } else if ((tab as string) === "users") {
         const res = await api.get("/admin/users?per_page=100").catch(() => ({ data: { data: [] } }));
         setUsers(res.data.data || res.data || []);
@@ -285,6 +323,9 @@ export default function AdminDashboard() {
       } else if (tab === "kyc") {
         const res = await api.get("/admin/users?kyc_status=pending&per_page=100").catch(() => ({ data: { data: [] } }));
         setKycUsers(res.data.data || []);
+      } else if (tab === "payments") {
+        const res = await api.get("/admin/transactions?per_page=50").catch(() => ({ data: { data: [] } }));
+        setTransactions(res.data.data || []);
       } else if (tab === "ambassadors") {
         const [amRes, wdRes, sellersRes] = await Promise.all([
           api.get("/admin/ambassadors").catch(() => ({ data: { data: [] } })),
@@ -306,6 +347,7 @@ export default function AdminDashboard() {
       await api.post(`/admin/listings/${id}/publish`);
       setListings(prev => prev.map(l => l.id === id ? { ...l, status: "published" as const } : l));
       setListingModal(prev => prev?.id === id ? { ...prev, status: "published" as const } : prev);
+      setTreatedExpertiseIds(prev => new Set([...prev, id]));
     } finally { setActionLoading(null); }
   }
 
@@ -317,6 +359,7 @@ export default function AdminDashboard() {
       setListingModal(prev => prev?.id === id ? { ...prev, status: "rejected" as const } : prev);
       setListingRejectMode(false);
       setListingRejectReason("");
+      setTreatedExpertiseIds(prev => new Set([...prev, id]));
     } finally { setActionLoading(null); }
   }
 
@@ -341,6 +384,73 @@ export default function AdminDashboard() {
     } finally {
       setSellerModalLoading(false);
     }
+  }
+
+  async function openSellerFromId(sellerId: number, sellerName: string) {
+    setListingModal(null);
+    setListingRejectMode(false);
+    setListingRejectReason("");
+    // Ouvrir le modal avec les infos de base immédiatement
+    setSellerModal({
+      id: sellerId, full_name: sellerName, email: "", created_at: "",
+      is_active: true, kyc_status: null, listings_count: 0, active: 0,
+      sold: 0, total_spent: 0, credits_used: 0, listing_credits: 0,
+      plans: { basic: 0, verified_phone: 0, verified_seller: 0 },
+    });
+    setSellerModalListings([]);
+    setSellerModalLoading(true);
+    try {
+      const [userRes, listingsRes] = await Promise.all([
+        api.get(`/admin/users/${sellerId}`),
+        api.get(`/admin/listings?per_page=100&seller_id=${sellerId}`),
+      ]);
+      const u = userRes.data;
+      const allL = u.listings || [];
+      const paidL = allL.filter((l: AdminListing) => l.payment_status === "paid");
+      const realL = paidL.filter((l: AdminListing) => !(l as AdminListing & { paid_via_credit?: boolean }).paid_via_credit);
+      const creditL = paidL.filter((l: AdminListing) => (l as AdminListing & { paid_via_credit?: boolean }).paid_via_credit);
+      const totalSpent = realL.reduce((s: number, l: AdminListing) =>
+        s + (PLAN_PRICES[l.plan ?? "basic"] ?? 0) + (l.is_boosted ? 500 : 0), 0);
+      setSellerModal({
+        id: u.id, full_name: u.full_name, email: u.email || "",
+        created_at: u.created_at, is_active: u.is_active,
+        kyc_status: u.kyc?.status || null,
+        listings_count: paidL.length,
+        active: paidL.filter((l: AdminListing) => l.status === "published").length,
+        sold: paidL.filter((l: AdminListing) => l.status === "sold").length,
+        total_spent: totalSpent, credits_used: creditL.length,
+        listing_credits: u.listing_credits || 0,
+        plans: {
+          basic:           realL.filter((l: AdminListing) => l.plan === "basic").length,
+          verified_phone:  realL.filter((l: AdminListing) => l.plan === "verified_phone").length,
+          verified_seller: realL.filter((l: AdminListing) => l.plan === "verified_seller").length,
+        },
+      });
+      setSellerModalListings(listingsRes.data.data || []);
+    } catch { /* garder les infos de base */ }
+    finally { setSellerModalLoading(false); }
+  }
+
+  async function loadMoreListings() {
+    setListingsLoadingMore(true);
+    try {
+      const next = listingsPage + 1;
+      const res = await api.get(`/admin/listings?per_page=20&page=${next}`);
+      setListings(prev => [...prev, ...(res.data.data || [])]);
+      setListingsPage(res.data.current_page || next);
+      setListingsLastPage(res.data.last_page || 1);
+    } finally { setListingsLoadingMore(false); }
+  }
+
+  async function loadMoreSellers() {
+    setSellersLoadingMore(true);
+    try {
+      const next = sellersPage + 1;
+      const res = await api.get(`/admin/sellers?per_page=20&page=${next}`);
+      setSellers(prev => [...prev, ...(res.data.data || [])]);
+      setSellersPage(res.data.current_page || next);
+      setSellersLastPage(res.data.last_page || 1);
+    } finally { setSellersLoadingMore(false); }
   }
 
   async function createStaff() {
@@ -468,10 +578,15 @@ export default function AdminDashboard() {
 
   const pendingListings = listings.filter(l => ["pending_expertise", "under_expertise"].includes(l.status));
   const expertiseQueue = listings.filter(l => l.status === "pending_expertise");
+  // All items visible in the expertise tab (pending + treated this session)
+  const expertiseVisible = listings.filter(l =>
+    ["pending_expertise", "under_expertise"].includes(l.status) || treatedExpertiseIds.has(l.id)
+  );
 
   const TABS = [
     { key: "overview",   label: "Vue d'ensemble",                    icon: LayoutDashboard },
     { key: "revenue",    label: "Revenus",                           icon: TrendingUp },
+    { key: "payments",   label: "Transactions",                      icon: CreditCard },
     { key: "listings",   label: "Annonces",  icon: Package,          badge: pendingListings.length },
     ...(isAdmin || isExpert ? [{ key: "expertises", label: "File expertise", icon: Microscope, badge: expertiseQueue.length }] : []),
     ...(isAdmin ? [{ key: "sellers", label: "Vendeurs", icon: Users }] : []),
@@ -736,6 +851,115 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {/* ── TRANSACTIONS ── */}
+          {tab === "payments" && isAdmin && (
+            <div className="space-y-4">
+              {/* Filtres statut */}
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  { key: "",           label: "Toutes" },
+                  { key: "pending",    label: "En cours" },
+                  { key: "completed",  label: "Terminées" },
+                  { key: "litigated",  label: "En litige" },
+                ] as { key: typeof txFilter; label: string }[]).map(f => (
+                  <button key={f.key} onClick={async () => {
+                    setTxFilter(f.key);
+                    const url = f.key ? `/admin/transactions?per_page=50&status=${f.key}` : "/admin/transactions?per_page=50";
+                    const res = await api.get(url).catch(() => ({ data: { data: [] } }));
+                    setTransactions(res.data.data || []);
+                  }}
+                    className="px-4 py-2 rounded-full text-sm font-semibold transition-all"
+                    style={{
+                      background: txFilter === f.key ? "#0B1A2B" : "rgba(11,26,43,0.06)",
+                      color: txFilter === f.key ? "#00D084" : "#0B1A2B",
+                    }}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {transactions.length === 0 ? (
+                <div className="card p-12 text-center">
+                  <CreditCard size={36} className="mx-auto mb-3 opacity-20" style={{ color: "#0B1A2B" }} />
+                  <p className="font-semibold" style={{ color: "#0B1A2B" }}>Aucune transaction</p>
+                  <p className="text-sm mt-1" style={{ color: "#8A99AA" }}>Les transactions d'achat apparaîtront ici.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {transactions.map(tx => {
+                    const STATUS_TX: Record<string, { label: string; color: string; bg: string }> = {
+                      pending:       { label: "En cours",      color: "#B8860B", bg: "rgba(184,134,11,0.1)" },
+                      in_retraction: { label: "Rétractation",  color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
+                      completed:     { label: "Terminée",      color: "#00B070", bg: "rgba(0,176,112,0.1)" },
+                      refunded:      { label: "Remboursée",    color: "#6366F1", bg: "rgba(99,102,241,0.1)" },
+                      litigated:     { label: "En litige",     color: "#CC0000", bg: "rgba(204,0,0,0.1)" },
+                    };
+                    const s = STATUS_TX[tx.status] ?? { label: tx.status, color: "#8A99AA", bg: "rgba(11,26,43,0.06)" };
+                    return (
+                      <div key={tx.id} className="card p-4">
+                        <div className="flex items-start gap-3">
+                          {/* Icône statut */}
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                            style={{ background: s.bg }}>
+                            <CreditCard size={16} style={{ color: s.color }} />
+                          </div>
+
+                          {/* Infos */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                                style={{ background: s.bg, color: s.color }}>
+                                {s.label}
+                              </span>
+                              <span className="text-xs font-mono" style={{ color: "#8A99AA" }}>
+                                #{tx.id}
+                              </span>
+                              <span className="text-xs" style={{ color: "#8A99AA" }}>
+                                {formatDate(tx.created_at)}
+                              </span>
+                            </div>
+
+                            {tx.listing && (
+                              <p className="text-sm font-semibold truncate" style={{ color: "#0B1A2B" }}>
+                                {tx.listing.iphone_model} {tx.listing.capacity} Go
+                              </p>
+                            )}
+
+                            <div className="flex items-center gap-3 mt-1 flex-wrap">
+                              {tx.buyer && (
+                                <span className="text-xs" style={{ color: "#8A99AA" }}>
+                                  Acheteur : <span style={{ color: "#0B1A2B", fontWeight: 600 }}>{tx.buyer.full_name}</span>
+                                </span>
+                              )}
+                              {tx.seller && (
+                                <span className="text-xs" style={{ color: "#8A99AA" }}>
+                                  Vendeur : <span style={{ color: "#0B1A2B", fontWeight: 600 }}>{tx.seller.full_name}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Montants */}
+                          <div className="text-right flex-shrink-0">
+                            <p className="font-bold text-sm font-mono" style={{ color: "#0B1A2B" }}>
+                              {formatPrice(tx.amount)}
+                            </p>
+                            <p className="text-xs" style={{ color: "#8A99AA" }}>
+                              Commission : {formatPrice(tx.commission)}
+                            </p>
+                            <p className="text-xs font-medium" style={{ color: "#00B070" }}>
+                              Net vendeur : {formatPrice(tx.seller_net)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── LISTINGS ── */}
           {tab === "listings" && (
             <div className="space-y-3">
@@ -745,48 +969,79 @@ export default function AdminDashboard() {
                     <PendingListingRow key={l.id} listing={l} onPublish={publishListing} onReject={rejectListing} actionLoading={actionLoading} showAll onDetail={() => setListingModal(l)} />
                   ))
               }
+              {listingsPage < listingsLastPage && (
+                <button
+                  onClick={loadMoreListings}
+                  disabled={listingsLoadingMore}
+                  className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
+                  style={{ background: "rgba(11,26,43,0.06)", color: listingsLoadingMore ? "#8A99AA" : "#0B1A2B" }}>
+                  {listingsLoadingMore ? "Chargement…" : "Charger plus"}
+                </button>
+              )}
             </div>
           )}
 
           {/* ── EXPERTISES ── */}
           {tab === "expertises" && (
             <div className="space-y-3">
-              {expertiseQueue.length === 0 ? (
+              {expertiseVisible.length === 0 ? (
                 <div className="text-center py-16">
                   <CheckCircle size={36} className="mx-auto mb-3 opacity-20" style={{ color: "#0B1A2B" }} />
                   <p className="font-semibold" style={{ color: "#0B1A2B" }}>File vide</p>
                   <p className="text-sm mt-1" style={{ color: "#8A99AA" }}>Toutes les annonces ont été traitées.</p>
                 </div>
-              ) : expertiseQueue.map(l => (
-                <div key={l.id} className="card p-4 flex items-center gap-4">
-                  <button className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 focus:outline-none" style={{ background: "#F0EDE8" }} onClick={() => setListingModal(l)}>
-                    {l.photos?.[0]
-                      ? <img src={l.photos[0].url} alt="" className="w-full h-full object-cover" />
-                      : <div className="w-full h-full flex items-center justify-center text-xl">📱</div>}
-                  </button>
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setListingModal(l)}>
-                    <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>
-                      {l.iphone_model} {l.capacity} Go · {CONDITION_LABELS[l.condition]}
-                    </p>
-                    <p className="text-xs" style={{ color: "#8A99AA" }}>
-                      {l.seller?.full_name} · {formatDate(l.created_at)} · {formatPrice(l.asking_price)}
-                    </p>
-                    {l.plan && l.plan !== "basic" && (
-                      <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium" style={{ color: "#00B070" }}>
-                        <BadgeCheck size={11} /> {PLAN_LABELS[l.plan]}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => publishListing(l.id)} loading={actionLoading === l.id}>
-                      <CheckCircle size={14} /> Valider
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => rejectListing(l.id)} loading={actionLoading === l.id}>
-                      <XCircle size={14} /> Refuser
-                    </Button>
-                  </div>
-                </div>
-              ))}
+              ) : (
+                <>
+                  {expertiseQueue.length === 0 && treatedExpertiseIds.size > 0 && (
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                      style={{ background: "rgba(0,208,132,0.07)", border: "1px solid rgba(0,208,132,0.2)" }}>
+                      <CheckCircle size={18} style={{ color: "#00B070" }} />
+                      <p className="text-sm font-medium" style={{ color: "#0B1A2B" }}>
+                        File vide — {treatedExpertiseIds.size} annonce{treatedExpertiseIds.size > 1 ? "s" : ""} traitée{treatedExpertiseIds.size > 1 ? "s" : ""} cette session
+                      </p>
+                    </div>
+                  )}
+                  {expertiseVisible.map(l => {
+                    const isTreated = treatedExpertiseIds.has(l.id) && !["pending_expertise", "under_expertise"].includes(l.status);
+                    const s = STATUS_LABELS[l.status];
+                    return (
+                      <div key={l.id} className="card p-4 flex items-center gap-4 transition-opacity"
+                        style={{ opacity: isTreated ? 0.55 : 1 }}>
+                        <button className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 focus:outline-none" style={{ background: "#F0EDE8" }} onClick={() => setListingModal(l)}>
+                          {l.photos?.[0]
+                            ? <img src={l.photos[0].url} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full flex items-center justify-center text-xl">📱</div>}
+                        </button>
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setListingModal(l)}>
+                          <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>
+                            {l.iphone_model} {l.capacity} Go · {CONDITION_LABELS[l.condition]}
+                          </p>
+                          <p className="text-xs" style={{ color: "#8A99AA" }}>
+                            {l.seller?.full_name} · {formatDate(l.created_at)} · {formatPrice(l.asking_price)}
+                          </p>
+                          {l.plan && l.plan !== "basic" && (
+                            <span className="inline-flex items-center gap-1 mt-1 text-xs font-medium" style={{ color: "#00B070" }}>
+                              <BadgeCheck size={11} /> {PLAN_LABELS[l.plan]}
+                            </span>
+                          )}
+                        </div>
+                        {isTreated ? (
+                          s ? <Badge variant={s.variant}>{s.label}</Badge> : <Badge variant="ink">{l.status}</Badge>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={() => publishListing(l.id)} loading={actionLoading === l.id}>
+                              <CheckCircle size={14} /> Valider
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={() => rejectListing(l.id)} loading={actionLoading === l.id}>
+                              <XCircle size={14} /> Refuser
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           )}
 
@@ -938,6 +1193,15 @@ export default function AdminDashboard() {
                   </div>
                 ))
               }
+              {sellersPage < sellersLastPage && (
+                <button
+                  onClick={loadMoreSellers}
+                  disabled={sellersLoadingMore}
+                  className="w-full py-3 rounded-xl text-sm font-semibold transition-all"
+                  style={{ background: "rgba(11,26,43,0.06)", color: sellersLoadingMore ? "#8A99AA" : "#0B1A2B" }}>
+                  {sellersLoadingMore ? "Chargement…" : "Charger plus"}
+                </button>
+              )}
             </div>
           )}
 
@@ -1391,10 +1655,16 @@ export default function AdminDashboard() {
 
               {/* Grid infos */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl p-3" style={{ background: "#F7F5F0" }}>
+                <button
+                  className="rounded-xl p-3 w-full text-left transition-colors hover:opacity-80"
+                  style={{ background: "#F7F5F0" }}
+                  onClick={() => listingModal.seller && openSellerFromId(listingModal.seller.id, listingModal.seller.full_name)}>
                   <p className="text-xs font-medium mb-0.5" style={{ color: "#8A99AA" }}>Vendeur</p>
-                  <p className="text-sm font-semibold" style={{ color: "#0B1A2B" }}>{listingModal.seller?.full_name}</p>
-                </div>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold" style={{ color: "#0B1A2B" }}>{listingModal.seller?.full_name}</p>
+                    <ExternalLink size={11} style={{ color: "#8A99AA" }} />
+                  </div>
+                </button>
                 {listingModal.whatsapp_number && (
                   <div className="rounded-xl p-3" style={{ background: "#F7F5F0" }}>
                     <p className="text-xs font-medium mb-0.5" style={{ color: "#8A99AA" }}>WhatsApp</p>

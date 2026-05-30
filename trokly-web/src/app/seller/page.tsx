@@ -12,7 +12,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import {
   Package, TrendingUp, Eye, Plus, Clock, CheckCircle,
-  BadgeCheck, CreditCard, Zap, EyeOff, CheckSquare, Gift, Tag
+  BadgeCheck, CreditCard, Zap, EyeOff, CheckSquare, Gift, Tag, Pencil, RefreshCw
 } from "lucide-react";
 
 type Tab = "overview" | "listings";
@@ -80,6 +80,18 @@ function SellerDashboardInner() {
     try {
       await api.delete(`/listings/${id}`);
       setListings(prev => prev.map(l => l.id === id ? { ...l, status: "unpublished" as const } : l));
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function republish(id: number) {
+    setActionLoading(id);
+    try {
+      await api.post(`/listings/${id}/republish`);
+      setListings(prev => prev.map(l => l.id === id ? { ...l, status: "published" as const } : l));
+    } catch {
+      // ignore
     } finally {
       setActionLoading(null);
     }
@@ -292,6 +304,14 @@ function SellerDashboardInner() {
                           : <><CreditCard size={13} /> Finaliser le paiement</>}
                       </Button>
                     )}
+                    {/* Modifier */}
+                    {["published", "unpublished", "draft", "rejected"].includes(l.status) && (
+                      <Link href={`/listings/${l.id}/edit`} className="flex-shrink-0">
+                        <Button size="sm" variant="ghost" style={{ color: "#0B1A2B" }}>
+                          <Pencil size={13} /> Modifier
+                        </Button>
+                      </Link>
+                    )}
                     {/* Marquer vendu */}
                     {l.status === "published" && (
                       <Button size="sm" variant="ghost"
@@ -299,6 +319,15 @@ function SellerDashboardInner() {
                         onClick={() => markSold(l.id)}
                         style={{ color: "#00B070" }}>
                         <CheckSquare size={13} /> Marquer vendu
+                      </Button>
+                    )}
+                    {/* Republier */}
+                    {l.status === "unpublished" && (
+                      <Button size="sm" variant="ghost"
+                        loading={actionLoading === l.id}
+                        onClick={() => republish(l.id)}
+                        style={{ color: "#00B070" }}>
+                        <RefreshCw size={13} /> Republier
                       </Button>
                     )}
                     {/* Voir l'annonce */}

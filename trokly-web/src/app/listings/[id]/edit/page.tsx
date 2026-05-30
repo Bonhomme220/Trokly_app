@@ -51,7 +51,7 @@ export default function EditListingPage() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    api.get<{ listing: Listing }>(`/listings/${id}`)
+    api.get<{ listing: Listing }>(`/my/listings/${id}`)
       .then(res => {
         const l = res.data.listing ?? (res.data as unknown as Listing);
         if (l.seller_id !== user?.id) { router.push("/seller"); return; }

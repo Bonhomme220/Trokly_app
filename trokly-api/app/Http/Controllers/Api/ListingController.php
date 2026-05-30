@@ -178,7 +178,7 @@ class ListingController extends Controller
             return response()->json(['message' => 'Non autorisé.'], 403);
         }
 
-        if (!in_array($listing->status, ['draft', 'rejected'])) {
+        if (!in_array($listing->status, ['draft', 'rejected', 'published', 'unpublished'])) {
             return response()->json(['message' => 'Cette annonce ne peut pas être modifiée.'], 422);
         }
 
@@ -191,6 +191,37 @@ class ListingController extends Controller
         $listing->update($request->only(['description', 'asking_price', 'whatsapp_number']));
 
         return response()->json(['message' => 'Annonce mise à jour.', 'listing' => $listing]);
+    }
+
+    public function showMine(Request $request, Listing $listing): JsonResponse
+    {
+        if ($listing->seller_id !== $request->user()->id) {
+            return response()->json(['message' => 'Non autorisé.'], 403);
+        }
+
+        return response()->json($listing->load(['photos', 'expertise']));
+    }
+
+    public function republish(Request $request, Listing $listing): JsonResponse
+    {
+        if ($listing->seller_id !== $request->user()->id) {
+            return response()->json(['message' => 'Non autorisé.'], 403);
+        }
+
+        if ($listing->status !== 'unpublished') {
+            return response()->json(['message' => 'Seules les annonces dépubliées peuvent être republiées.'], 422);
+        }
+
+        if ($listing->payment_status !== 'paid') {
+            return response()->json(['message' => 'Paiement requis pour republier.'], 422);
+        }
+
+        $listing->update([
+            'status'     => 'published',
+            'expires_at' => now()->addDays(30),
+        ]);
+
+        return response()->json(['message' => 'Annonce republiée pour 30 jours.', 'listing' => $listing]);
     }
 
     public function destroy(Request $request, Listing $listing): JsonResponse
