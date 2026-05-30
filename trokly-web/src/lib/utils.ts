@@ -14,12 +14,15 @@ export function formatPrice(amount: number): string {
   }).format(amount);
 }
 
-export function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "—";
   return new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(dateStr));
+  }).format(d);
 }
 
 export const CONDITION_LABELS: Record<Condition, string> = {
