@@ -243,7 +243,8 @@ export default function AdminDashboard() {
 
   // Payments / transactions
   const [transactions, setTransactions] = useState<AdminTransaction[]>([]);
-  const [txFilter, setTxFilter] = useState<"" | "pending" | "completed" | "litigated">("");
+  const [txPlanFilter, setTxPlanFilter] = useState<"" | "basic" | "verified_phone" | "verified_seller">("");
+  const [txMethodFilter, setTxMethodFilter] = useState<"" | "credit" | "payplus">("");
 
   // Expertise queue memory (listings treated during this session)
   const [treatedExpertiseIds, setTreatedExpertiseIds] = useState<Set<number>>(new Set());
@@ -885,27 +886,77 @@ export default function AdminDashboard() {
           )}
 
           {/* ── TRANSACTIONS (paiements PayPlus) ── */}
-          {tab === "payments" && isAdmin && (
+          {tab === "payments" && isAdmin && (() => {
+            // Filtrage client (les données sont déjà chargées)
+            const filtered = transactions.filter(tx => {
+              if (txPlanFilter && tx.plan !== txPlanFilter) return false;
+              if (txMethodFilter === "credit" && !tx.paid_via_credit) return false;
+              if (txMethodFilter === "payplus" && tx.paid_via_credit) return false;
+              return true;
+            });
+            const totalCA = filtered.filter(tx => !tx.paid_via_credit).reduce((s, tx) => s + tx.amount, 0);
+
+            return (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-lg" style={{ color: "#0B1A2B" }}>
-                  Paiements reçus
-                </h2>
-                <span className="text-sm px-3 py-1 rounded-full font-semibold"
-                  style={{ background: "rgba(0,208,132,0.12)", color: "#00B070" }}>
-                  {transactions.length} paiements
-                </span>
+              {/* Header + CA */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h2 className="font-semibold text-lg" style={{ color: "#0B1A2B" }}>Paiements reçus</h2>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm" style={{ color: "#8A99AA" }}>
+                    CA : <strong style={{ color: "#00B070" }}>{formatPrice(totalCA)}</strong>
+                  </span>
+                  <span className="text-sm px-3 py-1 rounded-full font-semibold"
+                    style={{ background: "rgba(0,208,132,0.12)", color: "#00B070" }}>
+                    {filtered.length} paiement{filtered.length > 1 ? "s" : ""}
+                  </span>
+                </div>
               </div>
 
-              {transactions.length === 0 ? (
+              {/* Filtres méthode */}
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  { key: "",        label: "Tous" },
+                  { key: "payplus", label: "PayPlus" },
+                  { key: "credit",  label: "Via crédit" },
+                ] as { key: typeof txMethodFilter; label: string }[]).map(f => (
+                  <button key={f.key}
+                    onClick={() => setTxMethodFilter(f.key)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                    style={{
+                      background: txMethodFilter === f.key ? "#0B1A2B" : "rgba(11,26,43,0.06)",
+                      color: txMethodFilter === f.key ? "#00D084" : "#0B1A2B",
+                    }}>
+                    {f.label}
+                  </button>
+                ))}
+                <div className="w-px mx-1" style={{ background: "rgba(11,26,43,0.1)" }} />
+                {([
+                  { key: "",                label: "Tous les plans" },
+                  { key: "basic",           label: "Simple" },
+                  { key: "verified_phone",  label: "Vérifiée" },
+                  { key: "verified_seller", label: "Vendeur vérifié" },
+                ] as { key: typeof txPlanFilter; label: string }[]).map(f => (
+                  <button key={f.key}
+                    onClick={() => setTxPlanFilter(f.key)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                    style={{
+                      background: txPlanFilter === f.key ? "#0B1A2B" : "rgba(11,26,43,0.06)",
+                      color: txPlanFilter === f.key ? "#00D084" : "#0B1A2B",
+                    }}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {filtered.length === 0 ? (
                 <div className="card p-12 text-center">
                   <CreditCard size={36} className="mx-auto mb-3 opacity-20" style={{ color: "#0B1A2B" }} />
                   <p className="font-semibold" style={{ color: "#0B1A2B" }}>Aucun paiement</p>
-                  <p className="text-sm mt-1" style={{ color: "#8A99AA" }}>Les paiements de publication apparaîtront ici.</p>
+                  <p className="text-sm mt-1" style={{ color: "#8A99AA" }}>Aucun résultat pour ces filtres.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {transactions.map(tx => {
+                  {filtered.map(tx => {
                     const PLAN_TX: Record<string, string> = {
                       basic: "Annonce simple",
                       verified_phone: "Annonce vérifiée",
@@ -982,7 +1033,8 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           {/* ── LISTINGS ── */}
           {tab === "listings" && (
