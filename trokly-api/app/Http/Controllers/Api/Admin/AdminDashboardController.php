@@ -110,14 +110,23 @@ class AdminDashboardController extends Controller
 
     public function sellers(Request $request): JsonResponse
     {
-        $users = User::with([
+        $query = User::with([
             'kyc:id,user_id,status',
             'listings' => fn($q) => $q->where('payment_status', 'paid')
                 ->select('id', 'seller_id', 'plan', 'is_boosted', 'status', 'paid_via_credit'),
         ])
         ->withCount('listings as total_listings')
-        ->orderByDesc('created_at')
-        ->paginate(min((int) $request->get('per_page', 50), 200));
+        ->orderByDesc('created_at');
+
+        if ($request->filled('search')) {
+            $s = $request->search;
+            $query->where(fn($q) => $q
+                ->where('full_name', 'ilike', "%{$s}%")
+                ->orWhere('email', 'ilike', "%{$s}%")
+            );
+        }
+
+        $users = $query->paginate(min((int) $request->get('per_page', 50), 500));
 
         $users->through(function ($user) {
             $paid       = $user->listings;

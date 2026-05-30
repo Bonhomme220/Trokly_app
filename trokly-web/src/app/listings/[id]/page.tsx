@@ -202,8 +202,9 @@ export default function ListingDetailPage() {
 
           {/* Seller */}
           {listing.seller && (
-            <div
-              className="flex items-center gap-3 p-3 rounded-xl mb-4"
+            <Link
+              href={`/vendeurs/${listing.seller_id}`}
+              className="flex items-center gap-3 p-3 rounded-xl mb-4 transition-opacity hover:opacity-80"
               style={{ background: "rgba(11,26,43,0.04)" }}
             >
               <div
@@ -226,7 +227,7 @@ export default function ListingDetailPage() {
                 <Eye size={12} />
                 {listing.views_count}
               </div>
-            </div>
+            </Link>
           )}
 
           {/* Description */}

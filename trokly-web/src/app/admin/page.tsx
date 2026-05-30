@@ -218,6 +218,8 @@ export default function AdminDashboard() {
   const [ambassadorSellerSearch, setAmbassadorSellerSearch] = useState("");
   const [ambassadorSellerSelected, setAmbassadorSellerSelected] = useState<AdminSeller | null>(null);
   const [ambassadorSellerOpen, setAmbassadorSellerOpen] = useState(false);
+  const [ambassadorSellerResults, setAmbassadorSellerResults] = useState<AdminSeller[]>([]);
+  const [ambassadorSellerSearching, setAmbassadorSellerSearching] = useState(false);
   const [ambassadorFormError, setAmbassadorFormError] = useState("");
   const [ambassadorFormSuccess, setAmbassadorFormSuccess] = useState("");
   const [ambassadorFormLoading, setAmbassadorFormLoading] = useState(false);
@@ -327,14 +329,12 @@ export default function AdminDashboard() {
         const res = await api.get("/admin/transactions?per_page=50").catch(() => ({ data: { data: [] } }));
         setTransactions(res.data.data || []);
       } else if (tab === "ambassadors") {
-        const [amRes, wdRes, sellersRes] = await Promise.all([
+        const [amRes, wdRes] = await Promise.all([
           api.get("/admin/ambassadors").catch(() => ({ data: { data: [] } })),
           api.get(`/admin/ambassador-withdrawals?status=${withdrawalFilter}`).catch(() => ({ data: { data: [] } })),
-          api.get("/admin/sellers?per_page=200").catch(() => ({ data: { data: [] } })),
         ]);
         setAmbassadors(amRes.data.data || []);
         setAmbassadorWithdrawals(wdRes.data.data || []);
-        setSellers(sellersRes.data.data || []);
       }
     } finally {
       setDataLoading(false);
@@ -1375,19 +1375,34 @@ export default function AdminDashboard() {
                           className="input"
                           placeholder="Rechercher par nom ou email…"
                           value={ambassadorSellerSearch}
-                          onChange={e => { setAmbassadorSellerSearch(e.target.value); setAmbassadorSellerOpen(true); }}
+                          onChange={e => {
+                            const q = e.target.value;
+                            setAmbassadorSellerSearch(q);
+                            setAmbassadorSellerOpen(true);
+                            if (q.length < 1) { setAmbassadorSellerResults([]); return; }
+                            setAmbassadorSellerSearching(true);
+                            // Debounce 300ms
+                            clearTimeout((window as Window & { _ambTimeout?: ReturnType<typeof setTimeout> })._ambTimeout);
+                            (window as Window & { _ambTimeout?: ReturnType<typeof setTimeout> })._ambTimeout = setTimeout(async () => {
+                              try {
+                                const res = await api.get(`/admin/sellers?search=${encodeURIComponent(q)}&per_page=8`);
+                                setAmbassadorSellerResults(res.data.data || []);
+                              } catch { setAmbassadorSellerResults([]); }
+                              finally { setAmbassadorSellerSearching(false); }
+                            }, 300);
+                          }}
                           onFocus={() => setAmbassadorSellerOpen(true)}
                           onBlur={() => setTimeout(() => setAmbassadorSellerOpen(false), 150)}
                         />
-                        {ambassadorSellerOpen && ambassadorSellerSearch.length >= 1 && (() => {
-                          const q = ambassadorSellerSearch.toLowerCase();
-                          const filtered = sellers.filter(s =>
-                            s.full_name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q)
-                          ).slice(0, 6);
-                          return filtered.length > 0 ? (
-                            <div className="absolute z-30 top-full mt-1 left-0 right-0 rounded-xl shadow-xl overflow-hidden"
-                              style={{ background: "white", border: "1px solid rgba(11,26,43,0.1)" }}>
-                              {filtered.map(s => (
+                        {ambassadorSellerOpen && ambassadorSellerSearch.length >= 1 && (
+                          <div className="absolute z-30 top-full mt-1 left-0 right-0 rounded-xl shadow-xl overflow-hidden"
+                            style={{ background: "white", border: "1px solid rgba(11,26,43,0.1)" }}>
+                            {ambassadorSellerSearching ? (
+                              <div className="px-4 py-3">
+                                <p className="text-sm" style={{ color: "#8A99AA" }}>Recherche…</p>
+                              </div>
+                            ) : ambassadorSellerResults.length > 0 ? (
+                              ambassadorSellerResults.map(s => (
                                 <button key={s.id}
                                   onMouseDown={() => { setAmbassadorSellerSelected(s); setAmbassadorSellerOpen(false); }}
                                   className="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between"
@@ -1401,15 +1416,14 @@ export default function AdminDashboard() {
                                     {s.listings_count} annonce{s.listings_count !== 1 ? "s" : ""}
                                   </span>
                                 </button>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="absolute z-30 top-full mt-1 left-0 right-0 rounded-xl shadow-xl px-4 py-3"
-                              style={{ background: "white", border: "1px solid rgba(11,26,43,0.1)" }}>
-                              <p className="text-sm" style={{ color: "#8A99AA" }}>Aucun vendeur trouvé.</p>
-                            </div>
-                          );
-                        })()}
+                              ))
+                            ) : (
+                              <div className="px-4 py-3">
+                                <p className="text-sm" style={{ color: "#8A99AA" }}>Aucun vendeur trouvé.</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

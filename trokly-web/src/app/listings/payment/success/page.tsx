@@ -10,22 +10,58 @@ function SuccessContent() {
   const params = useSearchParams();
   const listingId = params.get("listing_id");
   const [status, setStatus] = useState<"loading" | "confirmed" | "pending" | "error">("loading");
+  const [attempt, setAttempt] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     if (!listingId) { setStatus("error"); return; }
-    api.get(`/payments/verify?listing_id=${listingId}`)
-      .then(res => {
-        const s = res.data.listing?.status;
-        setStatus(s === "published" || s === "pending_expertise" ? "confirmed" : "pending");
-      })
-      .catch(() => setStatus("pending"));
-  }, [listingId]);
+    setStatus("loading");
+    setAttempt(0);
+
+    // PayPlus confirme de façon asynchrone — on retente jusqu'à 6 fois (12 secondes)
+    const MAX_ATTEMPTS = 6;
+    const DELAY_MS = 2000;
+    let cancelled = false;
+
+    const check = (n: number) => {
+      api.get(`/payments/verify?listing_id=${listingId}`)
+        .then(res => {
+          if (cancelled) return;
+          const s = res.data.listing?.status;
+          if (s === "published" || s === "pending_expertise") {
+            setStatus("confirmed");
+          } else if (n < MAX_ATTEMPTS) {
+            setAttempt(n + 1);
+            setTimeout(() => check(n + 1), DELAY_MS);
+          } else {
+            setStatus("pending");
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          if (n < MAX_ATTEMPTS) {
+            setAttempt(n + 1);
+            setTimeout(() => check(n + 1), DELAY_MS);
+          } else {
+            setStatus("pending");
+          }
+        });
+    };
+
+    check(0);
+    return () => { cancelled = true; };
+  }, [listingId, retryCount]);
 
   if (status === "loading") {
     return (
       <div className="text-center">
         <Loader size={32} className="animate-spin mx-auto mb-4" style={{ color: "#00D084" }} />
-        <p className="text-sm" style={{ color: "#8A99AA" }}>Vérification du paiement...</p>
+        <p className="text-sm font-medium" style={{ color: "#0B1A2B" }}>Vérification du paiement…</p>
+        {attempt > 0 && (
+          <p className="text-xs mt-1" style={{ color: "#8A99AA" }}>
+            Confirmation en cours ({attempt}/6)
+          </p>
+        )}
       </div>
     );
   }
@@ -44,9 +80,15 @@ function SuccessContent() {
         <>
           <Clock size={52} className="mx-auto mb-4" style={{ color: "#B8860B" }} />
           <h1 className="text-2xl font-bold mb-2" style={{ color: "#0B1A2B" }}>Paiement en cours de vérification</h1>
-          <p className="text-sm mb-8" style={{ color: "#8A99AA" }}>
-            Votre annonce sera activée dans quelques minutes.
+          <p className="text-sm mb-6" style={{ color: "#8A99AA" }}>
+            Le paiement n'a pas encore été confirmé par PayPlus. Votre annonce sera activée automatiquement dès que la confirmation arrive.
           </p>
+          <button
+            className="w-full py-3 px-6 rounded-xl font-semibold text-sm mb-3"
+            style={{ background: "rgba(184,134,11,0.1)", color: "#B8860B" }}
+            onClick={() => setRetryCount(r => r + 1)}>
+            Vérifier à nouveau
+          </button>
         </>
       )}
       <div className="flex flex-col gap-3">
