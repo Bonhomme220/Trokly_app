@@ -330,7 +330,7 @@ export default function AdminDashboard() {
         const [amRes, wdRes, sellersRes] = await Promise.all([
           api.get("/admin/ambassadors").catch(() => ({ data: { data: [] } })),
           api.get(`/admin/ambassador-withdrawals?status=${withdrawalFilter}`).catch(() => ({ data: { data: [] } })),
-          api.get("/admin/sellers").catch(() => ({ data: { data: [] } })),
+          api.get("/admin/sellers?per_page=200").catch(() => ({ data: { data: [] } })),
         ]);
         setAmbassadors(amRes.data.data || []);
         setAmbassadorWithdrawals(wdRes.data.data || []);

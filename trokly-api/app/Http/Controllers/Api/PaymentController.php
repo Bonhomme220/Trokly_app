@@ -53,8 +53,19 @@ class PaymentController extends Controller
     // Webhook appelé par PayPlus après paiement
     public function webhook(Request $request): JsonResponse
     {
-        // PayPlus envoie le token de la facture
-        $invoiceToken = $request->input('token');
+        // Logger tout le payload pour debug
+        \Illuminate\Support\Facades\Log::info('PayPlus webhook received', [
+            'method'  => $request->method(),
+            'all'     => $request->all(),
+            'headers' => $request->headers->all(),
+            'raw'     => $request->getContent(),
+        ]);
+
+        // PayPlus envoie le token de la facture — essayer plusieurs champs possibles
+        $invoiceToken = $request->input('token')
+            ?? $request->input('invoice_token')
+            ?? $request->query('token')
+            ?? $request->query('invoice_token');
 
         if (!$invoiceToken) {
             return response()->json(['message' => 'Missing token.'], 400);
@@ -64,7 +75,9 @@ class PaymentController extends Controller
 
         if (!$listing) {
             // Chercher via custom_data listing_id si disponible
-            $listingId = $request->input('customdata.listing_id') ?? $request->input('custom_data.listing_id');
+            $listingId = $request->input('customdata.listing_id')
+                ?? $request->input('custom_data.listing_id')
+                ?? $request->input('listing_id');
             if ($listingId) {
                 $listing = Listing::find($listingId);
             }

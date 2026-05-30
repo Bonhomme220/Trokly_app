@@ -100,10 +100,17 @@ class PaymentService
 
         $data = $response->json();
 
+        Log::info('PayPlus verifyPayment', [
+            'token'       => $invoiceToken,
+            'http_status' => $response->status(),
+            'body'        => $data,
+        ]);
+
         if (!$response->successful() || ($data['response_code'] ?? '') !== '00') {
             return false;
         }
 
-        return ($data['description'] ?? '') === 'completed';
+        // PayPlus peut retourner "completed", "Completed", "success"…
+        return strtolower($data['description'] ?? '') === 'completed';
     }
 }
