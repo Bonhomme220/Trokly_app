@@ -39,6 +39,12 @@ export const CONDITION_COLORS: Record<Condition, string> = {
   fair: "badge-warning",
 };
 
+export const PLAN_LABELS: Record<string, string> = {
+  basic:           "Annonce simple",
+  verified_phone:  "Annonce vérifiée",
+  verified_seller: "Vendeur vérifié",
+};
+
 export const CAPACITY_OPTIONS = [64, 128, 256, 512, 1024] as const;
 export const CONDITION_OPTIONS: Condition[] = ["new", "like_new", "good", "fair"];
 

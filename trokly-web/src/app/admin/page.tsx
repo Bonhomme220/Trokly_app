@@ -13,7 +13,7 @@ import {
   CheckCircle, XCircle, ShoppingBag, Users, Clock,
   Ban, UserCheck, UserPlus, Shield,
   BadgeCheck, Zap, Gift, X, Tag, Wallet, ArrowDownCircle, FileCheck,
-  CreditCard, ExternalLink,
+  CreditCard, ExternalLink, Pencil,
 } from "lucide-react";
 
 type Tab = "overview" | "revenue" | "listings" | "expertises" | "sellers" | "staff" | "ambassadors" | "kyc" | "payments";
@@ -224,6 +224,10 @@ export default function AdminDashboard() {
   const [ambassadorFormSuccess, setAmbassadorFormSuccess] = useState("");
   const [ambassadorFormLoading, setAmbassadorFormLoading] = useState(false);
   const [ambassadorActionLoading, setAmbassadorActionLoading] = useState<number | null>(null);
+  const [ambassadorEditCode, setAmbassadorEditCode] = useState<AmbassadorCode | null>(null);
+  const [ambassadorEditForm, setAmbassadorEditForm] = useState({ discount_percent: "", commission_percent: "" });
+  const [ambassadorEditLoading, setAmbassadorEditLoading] = useState(false);
+  const [ambassadorEditError, setAmbassadorEditError] = useState("");
   const [withdrawalFilter, setWithdrawalFilter] = useState<"pending" | "all">("pending");
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState("");
@@ -546,6 +550,33 @@ export default function AdminDashboard() {
       const res = await api.put(`/admin/ambassadors/${id}/toggle`);
       setAmbassadors(prev => prev.map(a => a.id === id ? { ...a, is_active: res.data.is_active } : a));
     } finally { setAmbassadorActionLoading(null); }
+  }
+
+  async function saveAmbassadorEdit() {
+    if (!ambassadorEditCode) return;
+    setAmbassadorEditError("");
+    const disc = parseInt(ambassadorEditForm.discount_percent);
+    const comm = parseInt(ambassadorEditForm.commission_percent);
+    if (!disc || disc < 1 || disc > 50) return setAmbassadorEditError("Réduction entre 1 et 50 %.");
+    if (!comm || comm < 1 || comm > 30) return setAmbassadorEditError("Commission entre 1 et 30 %.");
+    setAmbassadorEditLoading(true);
+    try {
+      await api.put(`/admin/ambassadors/${ambassadorEditCode.id}`, {
+        discount_percent: disc,
+        commission_percent: comm,
+      });
+      setAmbassadors(prev => prev.map(a =>
+        a.id === ambassadorEditCode.id
+          ? { ...a, discount_percent: disc, commission_percent: comm }
+          : a
+      ));
+      setAmbassadorEditCode(null);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string } } };
+      setAmbassadorEditError(err.response?.data?.message || "Erreur.");
+    } finally {
+      setAmbassadorEditLoading(false);
+    }
   }
 
   async function approveWithdrawal(id: number) {
@@ -1510,16 +1541,31 @@ export default function AdminDashboard() {
                                 {(a.wallet_balance ?? 0).toLocaleString("fr-FR")} FCFA
                               </p>
                             </div>
-                            <button
-                              disabled={ambassadorActionLoading === a.id}
-                              onClick={() => toggleAmbassadorCode(a.id)}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                              style={{
-                                background: a.is_active ? "rgba(204,0,0,0.08)" : "rgba(0,208,132,0.1)",
-                                color: a.is_active ? "#CC0000" : "#00B070",
-                              }}>
-                              {ambassadorActionLoading === a.id ? "…" : a.is_active ? "Désactiver" : "Activer"}
-                            </button>
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => {
+                                  setAmbassadorEditCode(a);
+                                  setAmbassadorEditForm({
+                                    discount_percent: String(a.discount_percent),
+                                    commission_percent: String(a.commission_percent),
+                                  });
+                                  setAmbassadorEditError("");
+                                }}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all"
+                                style={{ background: "rgba(11,26,43,0.07)", color: "#0B1A2B" }}>
+                                <Pencil size={11} /> Modifier
+                              </button>
+                              <button
+                                disabled={ambassadorActionLoading === a.id}
+                                onClick={() => toggleAmbassadorCode(a.id)}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                                style={{
+                                  background: a.is_active ? "rgba(204,0,0,0.08)" : "rgba(0,208,132,0.1)",
+                                  color: a.is_active ? "#CC0000" : "#00B070",
+                                }}>
+                                {ambassadorActionLoading === a.id ? "…" : a.is_active ? "Désactiver" : "Activer"}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1991,6 +2037,78 @@ export default function AdminDashboard() {
             <Button className="w-full" loading={creditLoading} onClick={giveCredits}>
               <Gift size={14} />
               Ajouter {creditAmount} crédit{creditAmount > 1 ? "s" : ""}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Ambassador edit modal */}
+      {ambassadorEditCode && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(11,26,43,0.55)", backdropFilter: "blur(6px)" }}
+          onClick={e => e.target === e.currentTarget && setAmbassadorEditCode(null)}
+        >
+          <div className="w-full max-w-sm rounded-2xl p-6 relative" style={{ background: "white", boxShadow: "0 24px 80px rgba(0,0,0,0.18)" }}>
+            <button
+              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(11,26,43,0.06)", color: "#0B1A2B" }}
+              onClick={() => setAmbassadorEditCode(null)}
+            >
+              <X size={14} />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(11,26,43,0.07)" }}>
+                <Pencil size={18} style={{ color: "#0B1A2B" }} />
+              </div>
+              <div>
+                <p className="font-bold" style={{ color: "#0B1A2B" }}>
+                  Modifier le code <span className="tracking-widest">{ambassadorEditCode.code}</span>
+                </p>
+                <p className="text-sm" style={{ color: "#8A99AA" }}>{ambassadorEditCode.user?.full_name}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 mb-4">
+              <div>
+                <label className="text-sm font-medium block mb-1" style={{ color: "#0B1A2B" }}>
+                  Réduction acheteur (%)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  className="input"
+                  value={ambassadorEditForm.discount_percent}
+                  onChange={e => setAmbassadorEditForm(f => ({ ...f, discount_percent: e.target.value }))}
+                />
+                <p className="text-xs mt-1" style={{ color: "#8A99AA" }}>Déduit du prix lors du paiement. Entre 1 et 50 %.</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1" style={{ color: "#0B1A2B" }}>
+                  Commission ambassadeur (%)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  className="input"
+                  value={ambassadorEditForm.commission_percent}
+                  onChange={e => setAmbassadorEditForm(f => ({ ...f, commission_percent: e.target.value }))}
+                />
+                <p className="text-xs mt-1" style={{ color: "#8A99AA" }}>Reversée à l'ambassadeur sur chaque utilisation. Entre 1 et 30 %.</p>
+              </div>
+            </div>
+
+            {ambassadorEditError && (
+              <p className="text-sm mb-3" style={{ color: "#CC0000" }}>{ambassadorEditError}</p>
+            )}
+
+            <Button className="w-full" loading={ambassadorEditLoading} onClick={saveAmbassadorEdit}>
+              <Pencil size={14} />
+              Enregistrer les modifications
             </Button>
           </div>
         </div>

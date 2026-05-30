@@ -60,6 +60,25 @@ class AdminAmbassadorController extends Controller
         ], 201);
     }
 
+    /** PUT /api/admin/ambassadors/{code} — modifier les paramètres */
+    public function update(Request $request, AmbassadorCode $code): JsonResponse
+    {
+        $request->validate([
+            'discount_percent'   => 'required|integer|min:1|max:50',
+            'commission_percent' => 'required|integer|min:1|max:30',
+        ]);
+
+        $code->update([
+            'discount_percent'   => $request->discount_percent,
+            'commission_percent' => $request->commission_percent,
+        ]);
+
+        return response()->json([
+            'message' => "Code {$code->code} mis à jour.",
+            'code'    => $code,
+        ]);
+    }
+
     /** PUT /api/admin/ambassadors/{code}/toggle — activer/désactiver */
     public function toggle(AmbassadorCode $code): JsonResponse
     {

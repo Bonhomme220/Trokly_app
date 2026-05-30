@@ -161,6 +161,7 @@ Route::middleware('auth:sanctum')->group(function () {
         // Ambassadeurs
         Route::get('ambassadors', [AdminAmbassadorController::class, 'index']);
         Route::post('ambassadors', [AdminAmbassadorController::class, 'store']);
+        Route::put('ambassadors/{code}', [AdminAmbassadorController::class, 'update']);
         Route::put('ambassadors/{code}/toggle', [AdminAmbassadorController::class, 'toggle']);
         Route::get('ambassador-withdrawals', [AdminAmbassadorController::class, 'withdrawals']);
         Route::post('ambassador-withdrawals/{withdrawal}/approve', [AdminAmbassadorController::class, 'approveWithdrawal']);
