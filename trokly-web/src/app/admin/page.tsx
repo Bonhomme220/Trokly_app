@@ -1722,7 +1722,20 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Actions */}
+              {/* Publier manuellement une annonce en attente de paiement */}
+              {["draft", "rejected", "unpublished"].includes(listingModal.status) && (
+                <div className="pt-4" style={{ borderTop: "1px solid rgba(11,26,43,0.07)" }}>
+                  <Button className="w-full" loading={actionLoading === listingModal.id}
+                    onClick={() => publishListing(listingModal.id)}>
+                    <CheckCircle size={15} /> Publier manuellement
+                  </Button>
+                  <p className="text-xs text-center mt-2" style={{ color: "#8A99AA" }}>
+                    Force la publication et marque le paiement comme acquitté.
+                  </p>
+                </div>
+              )}
+
+              {/* Actions expertise */}
               {["pending_expertise", "under_expertise"].includes(listingModal.status) && (
                 <div className="pt-4" style={{ borderTop: "1px solid rgba(11,26,43,0.07)" }}>
                   {listingRejectMode ? (

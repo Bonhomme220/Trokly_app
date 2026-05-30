@@ -38,11 +38,17 @@ class AdminListingController extends Controller
 
     public function publish(Listing $listing): JsonResponse
     {
-        if ($listing->status !== 'pending_expertise') {
+        $allowed = ['pending_expertise', 'under_expertise', 'draft', 'unpublished', 'rejected'];
+
+        if (!in_array($listing->status, $allowed)) {
             return response()->json(['message' => 'Statut invalide pour cette action.'], 422);
         }
 
-        $listing->update(['status' => 'published']);
+        $listing->update([
+            'status'         => 'published',
+            'payment_status' => 'paid',
+            'expires_at'     => $listing->expires_at ?? now()->addDays(30),
+        ]);
 
         return response()->json(['message' => 'Annonce publiée.']);
     }
