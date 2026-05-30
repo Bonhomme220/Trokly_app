@@ -12,15 +12,24 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('listings', function (Blueprint $table) {
-            $table->string('ambassador_code')->nullable()->after('payment_reference');
-            $table->unsignedInteger('discount_amount')->default(0)->after('ambassador_code');
+            if (!Schema::hasColumn('listings', 'ambassador_code')) {
+                $table->string('ambassador_code')->nullable()->after('payment_reference');
+            }
+            if (!Schema::hasColumn('listings', 'discount_amount')) {
+                $table->unsignedInteger('discount_amount')->default(0)->after('ambassador_code');
+            }
         });
     }
 
     public function down(): void
     {
         Schema::table('listings', function (Blueprint $table) {
-            $table->dropColumn(['ambassador_code', 'discount_amount']);
+            if (Schema::hasColumn('listings', 'ambassador_code')) {
+                $table->dropColumn('ambassador_code');
+            }
+            if (Schema::hasColumn('listings', 'discount_amount')) {
+                $table->dropColumn('discount_amount');
+            }
         });
     }
 };
