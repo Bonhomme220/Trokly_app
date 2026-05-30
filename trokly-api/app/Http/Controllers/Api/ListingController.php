@@ -121,6 +121,8 @@ class ListingController extends Controller
                 'paid_via_credit' => $usedCredit,
                 'status'          => $usedCredit ? ($request->plan === 'basic' ? 'published' : 'pending_expertise') : 'draft',
                 'expires_at'      => $usedCredit ? now()->addDays(30) : null,
+                'ambassador_code' => $request->ambassador_code ?: null,
+                'discount_amount' => $request->integer('discount_amount', 0),
             ]);
 
             foreach ($request->photos as $index => $url) {

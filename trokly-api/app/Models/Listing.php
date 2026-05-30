@@ -33,6 +33,8 @@ class Listing extends Model
         'quality_grade',
         'status',
         'views_count',
+        'ambassador_code',
+        'discount_amount',
     ];
 
     protected function casts(): array
@@ -41,7 +43,8 @@ class Listing extends Model
             'accepts_trade'   => 'boolean',
             'is_boosted'      => 'boolean',
             'paid_via_credit' => 'boolean',
-            'asking_price'   => 'integer',
+            'asking_price'    => 'integer',
+            'discount_amount' => 'integer',
             'ai_suggested_price' => 'integer',
             'retail_price'   => 'integer',
             'views_count'    => 'integer',

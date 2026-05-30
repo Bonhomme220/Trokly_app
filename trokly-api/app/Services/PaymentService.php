@@ -23,7 +23,9 @@ class PaymentService
 
     public function createPaymentLink(Listing $listing, string $returnUrl, string $cancelUrl): array
     {
-        $amount      = self::totalPrice($listing->plan, $listing->is_boosted);
+        $baseAmount  = self::totalPrice($listing->plan, $listing->is_boosted);
+        $discount    = (int) ($listing->discount_amount ?? 0);
+        $amount      = max(1, $baseAmount - $discount); // jamais < 1 FCFA
         $callbackUrl = rtrim(config('app.url'), '/') . '/api/payments/webhook';
         $frontUrl    = rtrim(config('app.frontend_url', 'https://trokly.bj'), '/');
 
@@ -33,7 +35,9 @@ class PaymentService
             'verified_seller' => 'Annonce vendeur vérifié',
         };
 
-        $description = $planLabel . ($listing->is_boosted ? ' + TOP annonces' : '');
+        $description = $planLabel
+            . ($listing->is_boosted ? ' + TOP annonces' : '')
+            . ($discount > 0 ? " (code {$listing->ambassador_code})" : '');
 
         $payload = [
             'commande' => [
