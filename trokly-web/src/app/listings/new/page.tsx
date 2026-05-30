@@ -139,6 +139,7 @@ export default function NewListingPage() {
     if (!form.color)                  return setError("Choisissez la couleur.");
     if (!form.asking_price)           return setError("Entrez le prix demandé.");
     if (!form.whatsapp_number.trim()) return setError("Entrez votre numéro WhatsApp.");
+    if (!/^\+\d{6,15}$/.test(form.whatsapp_number.replace(/\s/g, ''))) return setError("Le numéro WhatsApp doit inclure l'indicatif pays (ex: +22901XXXXXXXX).");
     if (filledPhotos.length < 3)      return setError("Ajoutez au moins 3 photos.");
 
     setSubmitting(true);
@@ -472,7 +473,12 @@ export default function NewListingPage() {
                 Numéro WhatsApp *
               </label>
               <input className="input" type="tel" placeholder="+229 01 XX XX XX XX"
-                value={form.whatsapp_number} onChange={e => setField("whatsapp_number", e.target.value)} />
+                value={form.whatsapp_number}
+                onChange={e => setField("whatsapp_number", e.target.value)}
+                onBlur={e => {
+                  const cleaned = e.target.value.replace(/\s+/g, '');
+                  setField("whatsapp_number", cleaned);
+                }} />
               <p className="text-xs mt-1.5" style={{ color: "#8A99AA" }}>
                 Les acheteurs intéressés vous contacteront directement sur ce numéro.
               </p>

@@ -52,6 +52,7 @@ export default function EditListingPage() {
     const price = parseFloat(form.asking_price);
     if (!price || price < 1000) return setError("Le prix doit être au minimum 1 000 FCFA.");
     if (!form.whatsapp_number.trim()) return setError("Le numéro WhatsApp est requis.");
+    if (!/^\+\d{6,15}$/.test(form.whatsapp_number.replace(/\s/g, ''))) return setError("Le numéro WhatsApp doit inclure l'indicatif pays (ex: +22901XXXXXXXX).");
     setSubmitting(true);
     try {
       await api.put(`/listings/${id}`, {
@@ -146,6 +147,7 @@ export default function EditListingPage() {
                 placeholder="Ex: +229 97 00 00 00"
                 value={form.whatsapp_number}
                 onChange={e => setForm(f => ({ ...f, whatsapp_number: e.target.value }))}
+                onBlur={e => setForm(f => ({ ...f, whatsapp_number: e.target.value.replace(/\s+/g, '') }))}
               />
             </div>
 

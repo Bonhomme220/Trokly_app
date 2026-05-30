@@ -76,7 +76,7 @@ class ListingController extends Controller
             'imei'            => 'nullable|string|unique:listings,imei',
             'description'     => 'nullable|string|max:1000',
             'asking_price'    => 'required|integer|min:1000',
-            'whatsapp_number' => 'required|string|max:20',
+            'whatsapp_number' => ['required', 'string', 'max:20', 'regex:/^\+\d{6,15}$/'],
             'plan'            => 'required|in:basic,verified_phone,verified_seller',
             'is_boosted'      => 'boolean',
             'photos'          => 'required|array|min:1',
@@ -187,7 +187,7 @@ class ListingController extends Controller
         $request->validate([
             'description'     => 'nullable|string|max:1000',
             'asking_price'    => 'sometimes|integer|min:1000',
-            'whatsapp_number' => 'sometimes|string|max:20',
+            'whatsapp_number' => ['sometimes', 'string', 'max:20', 'regex:/^\+\d{6,15}$/'],
         ]);
 
         $listing->update($request->only(['description', 'asking_price', 'whatsapp_number']));
