@@ -304,6 +304,34 @@ function SellerDashboardInner() {
                           : <><CreditCard size={13} /> Finaliser le paiement</>}
                       </Button>
                     )}
+                    {/* Expertise en attente — info */}
+                    {l.status === "pending_expertise" && (
+                      <p className="text-xs w-full py-1.5 px-3 rounded-lg"
+                        style={{ background: "rgba(184,134,11,0.08)", color: "#B8860B" }}>
+                        ⏳ Un expert va vous contacter sur WhatsApp pour fixer un rendez-vous de vérification.
+                      </p>
+                    )}
+                    {/* Expertise en cours — info */}
+                    {l.status === "under_expertise" && (
+                      <p className="text-xs w-full py-1.5 px-3 rounded-lg"
+                        style={{ background: "rgba(184,134,11,0.08)", color: "#B8860B" }}>
+                        🔍 Expertise en cours — votre annonce sera publiée dès validation par l'expert.
+                      </p>
+                    )}
+                    {/* Annonce vendue */}
+                    {l.status === "sold" && (
+                      <p className="text-xs w-full py-1.5 px-3 rounded-lg"
+                        style={{ background: "rgba(0,176,112,0.08)", color: "#00B070" }}>
+                        ✅ Annonce vendue — félicitations !
+                      </p>
+                    )}
+                    {/* Rejeté — info */}
+                    {l.status === "rejected" && (
+                      <p className="text-xs w-full py-1.5 px-3 rounded-lg"
+                        style={{ background: "rgba(204,0,0,0.07)", color: "#CC0000" }}>
+                        ❌ Annonce refusée à l'expertise. Modifiez-la et relancez un paiement, ou utilisez votre crédit.
+                      </p>
+                    )}
                     {/* Modifier */}
                     {["published", "unpublished", "draft", "rejected"].includes(l.status) && (
                       <Link href={`/listings/${l.id}/edit`} className="flex-shrink-0">

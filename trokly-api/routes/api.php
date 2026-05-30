@@ -143,10 +143,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('expertises/{expertise}/reject', [AdminExpertiseController::class, 'reject']);
         Route::post('quick-sale/{listing}/decide', [AdminExpertiseController::class, 'quickSaleDecide']);
 
-        // Transactions
-        Route::get('transactions', [AdminTransactionController::class, 'index']);
-        Route::get('transactions/{transaction}', [AdminTransactionController::class, 'show']);
-        Route::post('transactions/{transaction}/release', [AdminTransactionController::class, 'release']);
+        // Paiements (anciennement "transactions" escrow — remplacé par les paiements PayPlus)
+        Route::get('transactions', [AdminListingController::class, 'payments']);
 
         // Livraisons
         Route::get('deliveries', [AdminDeliveryController::class, 'index']);

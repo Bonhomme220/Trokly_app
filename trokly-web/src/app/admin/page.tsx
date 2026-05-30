@@ -94,14 +94,16 @@ interface AdminSeller {
 
 interface AdminTransaction {
   id: number;
-  listing?: { id: number; iphone_model: string; capacity: number };
-  buyer?: { id: number; full_name: string; phone_number: string };
-  seller?: { id: number; full_name: string; phone_number: string };
+  listing?: { id: number; iphone_model: string; capacity: number; status: string };
+  seller?: { id: number; full_name: string; email: string };
   amount: number;
-  commission: number;
-  seller_net: number;
-  status: "pending" | "in_retraction" | "completed" | "refunded" | "litigated";
+  plan: string;
+  is_boosted: boolean;
+  ambassador_code?: string;
+  discount_amount: number;
+  paid_via_credit: boolean;
   payment_reference?: string;
+  status: "completed";
   created_at: string;
 }
 
@@ -882,69 +884,59 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* ── TRANSACTIONS ── */}
+          {/* ── TRANSACTIONS (paiements PayPlus) ── */}
           {tab === "payments" && isAdmin && (
             <div className="space-y-4">
-              {/* Filtres statut */}
-              <div className="flex gap-2 flex-wrap">
-                {([
-                  { key: "",           label: "Toutes" },
-                  { key: "pending",    label: "En cours" },
-                  { key: "completed",  label: "Terminées" },
-                  { key: "litigated",  label: "En litige" },
-                ] as { key: typeof txFilter; label: string }[]).map(f => (
-                  <button key={f.key} onClick={async () => {
-                    setTxFilter(f.key);
-                    const url = f.key ? `/admin/transactions?per_page=50&status=${f.key}` : "/admin/transactions?per_page=50";
-                    const res = await api.get(url).catch(() => ({ data: { data: [] } }));
-                    setTransactions(res.data.data || []);
-                  }}
-                    className="px-4 py-2 rounded-full text-sm font-semibold transition-all"
-                    style={{
-                      background: txFilter === f.key ? "#0B1A2B" : "rgba(11,26,43,0.06)",
-                      color: txFilter === f.key ? "#00D084" : "#0B1A2B",
-                    }}>
-                    {f.label}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-lg" style={{ color: "#0B1A2B" }}>
+                  Paiements reçus
+                </h2>
+                <span className="text-sm px-3 py-1 rounded-full font-semibold"
+                  style={{ background: "rgba(0,208,132,0.12)", color: "#00B070" }}>
+                  {transactions.length} paiements
+                </span>
               </div>
 
               {transactions.length === 0 ? (
                 <div className="card p-12 text-center">
                   <CreditCard size={36} className="mx-auto mb-3 opacity-20" style={{ color: "#0B1A2B" }} />
-                  <p className="font-semibold" style={{ color: "#0B1A2B" }}>Aucune transaction</p>
-                  <p className="text-sm mt-1" style={{ color: "#8A99AA" }}>Les transactions d'achat apparaîtront ici.</p>
+                  <p className="font-semibold" style={{ color: "#0B1A2B" }}>Aucun paiement</p>
+                  <p className="text-sm mt-1" style={{ color: "#8A99AA" }}>Les paiements de publication apparaîtront ici.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {transactions.map(tx => {
-                    const STATUS_TX: Record<string, { label: string; color: string; bg: string }> = {
-                      pending:       { label: "En cours",      color: "#B8860B", bg: "rgba(184,134,11,0.1)" },
-                      in_retraction: { label: "Rétractation",  color: "#F59E0B", bg: "rgba(245,158,11,0.1)" },
-                      completed:     { label: "Terminée",      color: "#00B070", bg: "rgba(0,176,112,0.1)" },
-                      refunded:      { label: "Remboursée",    color: "#6366F1", bg: "rgba(99,102,241,0.1)" },
-                      litigated:     { label: "En litige",     color: "#CC0000", bg: "rgba(204,0,0,0.1)" },
+                    const PLAN_TX: Record<string, string> = {
+                      basic: "Annonce simple",
+                      verified_phone: "Annonce vérifiée",
+                      verified_seller: "Vendeur vérifié",
                     };
-                    const s = STATUS_TX[tx.status] ?? { label: tx.status, color: "#8A99AA", bg: "rgba(11,26,43,0.06)" };
                     return (
                       <div key={tx.id} className="card p-4">
                         <div className="flex items-start gap-3">
-                          {/* Icône statut */}
                           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{ background: s.bg }}>
-                            <CreditCard size={16} style={{ color: s.color }} />
+                            style={{ background: "rgba(0,208,132,0.1)" }}>
+                            <CreditCard size={16} style={{ color: "#00B070" }} />
                           </div>
 
-                          {/* Infos */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
                               <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                                style={{ background: s.bg, color: s.color }}>
-                                {s.label}
+                                style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
+                                {tx.paid_via_credit ? "Via crédit" : "PayPlus"}
                               </span>
-                              <span className="text-xs font-mono" style={{ color: "#8A99AA" }}>
-                                #{tx.id}
-                              </span>
+                              {tx.is_boosted && (
+                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                                  style={{ background: "rgba(245,158,11,0.12)", color: "#F59E0B" }}>
+                                  ⚡ TOP
+                                </span>
+                              )}
+                              {tx.ambassador_code && (
+                                <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                                  style={{ background: "rgba(99,102,241,0.1)", color: "#6366F1" }}>
+                                  🏷 {tx.ambassador_code}
+                                </span>
+                              )}
                               <span className="text-xs" style={{ color: "#8A99AA" }}>
                                 {formatDate(tx.created_at)}
                               </span>
@@ -957,30 +949,31 @@ export default function AdminDashboard() {
                             )}
 
                             <div className="flex items-center gap-3 mt-1 flex-wrap">
-                              {tx.buyer && (
-                                <span className="text-xs" style={{ color: "#8A99AA" }}>
-                                  Acheteur : <span style={{ color: "#0B1A2B", fontWeight: 600 }}>{tx.buyer.full_name}</span>
-                                </span>
-                              )}
+                              <span className="text-xs" style={{ color: "#8A99AA" }}>
+                                {PLAN_TX[tx.plan] ?? tx.plan}
+                              </span>
                               {tx.seller && (
                                 <span className="text-xs" style={{ color: "#8A99AA" }}>
-                                  Vendeur : <span style={{ color: "#0B1A2B", fontWeight: 600 }}>{tx.seller.full_name}</span>
+                                  · <span style={{ color: "#0B1A2B", fontWeight: 600 }}>{tx.seller.full_name}</span>
                                 </span>
                               )}
                             </div>
                           </div>
 
-                          {/* Montants */}
                           <div className="text-right flex-shrink-0">
                             <p className="font-bold text-sm font-mono" style={{ color: "#0B1A2B" }}>
-                              {formatPrice(tx.amount)}
+                              {tx.paid_via_credit ? "0 FCFA" : formatPrice(tx.amount)}
                             </p>
-                            <p className="text-xs" style={{ color: "#8A99AA" }}>
-                              Commission : {formatPrice(tx.commission)}
-                            </p>
-                            <p className="text-xs font-medium" style={{ color: "#00B070" }}>
-                              Net vendeur : {formatPrice(tx.seller_net)}
-                            </p>
+                            {tx.discount_amount > 0 && (
+                              <p className="text-xs" style={{ color: "#6366F1" }}>
+                                −{formatPrice(tx.discount_amount)}
+                              </p>
+                            )}
+                            {tx.listing && (
+                              <p className="text-xs mt-0.5" style={{ color: "#8A99AA" }}>
+                                annonce #{tx.listing.id}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1768,8 +1761,8 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-              {/* Publier manuellement une annonce en attente de paiement */}
-              {["draft", "rejected", "unpublished"].includes(listingModal.status) && (
+              {/* Publier manuellement */}
+              {["draft", "rejected", "unpublished", "pending_expertise", "under_expertise"].includes(listingModal.status) && (
                 <div className="pt-4" style={{ borderTop: "1px solid rgba(11,26,43,0.07)" }}>
                   <Button className="w-full" loading={actionLoading === listingModal.id}
                     onClick={() => publishListing(listingModal.id)}>
