@@ -117,9 +117,9 @@ class PaymentService
             return false;
         }
 
-        // On se fie uniquement à "description" — PayPlus retourne "completed" quand le paiement est passé.
-        // On n'exige pas response_code === "00" car il peut varier selon le statut de la transaction.
-        $description = strtolower($data['description'] ?? '');
-        return in_array($description, ['completed', 'success']);
+        // PayPlus retourne le statut dans le champ "status" (et non "description" qui est vide).
+        // On accepte aussi "description" en fallback au cas où le format changerait.
+        $status = strtolower($data['status'] ?? $data['description'] ?? '');
+        return in_array($status, ['completed', 'success']);
     }
 }
