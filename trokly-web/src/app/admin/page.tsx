@@ -253,6 +253,7 @@ export default function AdminDashboard() {
   const [listingsPage, setListingsPage] = useState(1);
   const [listingsLastPage, setListingsLastPage] = useState(1);
   const [listingsLoadingMore, setListingsLoadingMore] = useState(false);
+  const [listingsStatusFilter, setListingsStatusFilter] = useState("");
 
   // Pagination — sellers tab
   const [sellersPage, setSellersPage] = useState(1);
@@ -290,6 +291,12 @@ export default function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statsDays]);
 
+  // Reload listings when status filter changes
+  useEffect(() => {
+    if (tab === "listings" && canAccess) loadTabData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listingsStatusFilter]);
+
   async function loadStats(days: number) {
     setDataLoading(true);
     try {
@@ -304,17 +311,22 @@ export default function AdminDashboard() {
     setDataLoading(true);
     try {
       if (tab === "overview") {
-        const [lstRes] = await Promise.all([
+        const [lstRes, stRes] = await Promise.all([
           api.get("/admin/listings?per_page=100"),
+          api.get("/admin/stats?days=30").catch(() => ({ data: null })),
         ]);
         setListings(lstRes.data.data || []);
+        if (stRes.data) setStats(stRes.data);
       } else if (tab === "revenue") {
         await loadStats(statsDays);
       } else if (tab === "expertises") {
         const res = await api.get("/admin/listings?per_page=100");
         setListings(res.data.data || []);
       } else if (tab === "listings") {
-        const res = await api.get("/admin/listings?per_page=20&page=1");
+        const url = listingsStatusFilter
+          ? `/admin/listings?per_page=20&page=1&status=${listingsStatusFilter}`
+          : "/admin/listings?per_page=20&page=1";
+        const res = await api.get(url);
         setListings(res.data.data || []);
         setListingsPage(res.data.current_page || 1);
         setListingsLastPage(res.data.last_page || 1);
@@ -442,7 +454,10 @@ export default function AdminDashboard() {
     setListingsLoadingMore(true);
     try {
       const next = listingsPage + 1;
-      const res = await api.get(`/admin/listings?per_page=20&page=${next}`);
+      const url = listingsStatusFilter
+        ? `/admin/listings?per_page=20&page=${next}&status=${listingsStatusFilter}`
+        : `/admin/listings?per_page=20&page=${next}`;
+      const res = await api.get(url);
       setListings(prev => [...prev, ...(res.data.data || [])]);
       setListingsPage(res.data.current_page || next);
       setListingsLastPage(res.data.last_page || 1);
@@ -676,11 +691,15 @@ export default function AdminDashboard() {
           {/* ── OVERVIEW ── */}
           {tab === "overview" && (
             <div className="space-y-8">
-              <div className="grid grid-cols-3 gap-4">
+              {/* KPIs réels depuis /admin/stats */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {[
-                  { icon: Package,    label: "Total annonces",       value: listings.length,    color: "#0B1A2B" },
-                  { icon: Clock,      label: "En attente expertise",  value: expertiseQueue.length, color: "#B8860B" },
-                  { icon: ShoppingBag, label: "Publiées",             value: listings.filter(l => l.status === "published").length, color: "#00B070" },
+                  { icon: Package,     label: "Total annonces",        value: stats?.listings?.total        ?? listings.length,                                     color: "#0B1A2B" },
+                  { icon: ShoppingBag, label: "Publiées",               value: stats?.listings?.published    ?? listings.filter(l => l.status === "published").length, color: "#00B070" },
+                  { icon: CheckCircle, label: "Vendues",                 value: stats?.listings?.sold         ?? listings.filter(l => l.status === "sold").length,      color: "#0B1A2B" },
+                  { icon: Clock,       label: "En attente expertise",   value: stats?.listings?.pending_expertise ?? expertiseQueue.length,                           color: "#B8860B" },
+                  { icon: CreditCard,  label: "CA total (paiements)",   value: stats ? formatPrice(stats.revenue.total) : "—",                                        color: "#00B070" },
+                  { icon: Users,       label: "Vendeurs inscrits",      value: stats?.sellers?.total         ?? "—",                                                   color: "#0B1A2B" },
                 ].map(({ icon: Icon, label, value, color }) => (
                   <div key={label} className="card p-5">
                     <div className="flex items-center gap-2 mb-3">
@@ -1039,6 +1058,30 @@ export default function AdminDashboard() {
           {/* ── LISTINGS ── */}
           {tab === "listings" && (
             <div className="space-y-3">
+              {/* Filtres statut */}
+              <div className="flex gap-2 flex-wrap pb-1">
+                {([
+                  { key: "",                   label: "Toutes" },
+                  { key: "published",          label: "Publiées" },
+                  { key: "draft",              label: "En attente paiement" },
+                  { key: "pending_expertise",  label: "En attente expertise" },
+                  { key: "under_expertise",    label: "Sous expertise" },
+                  { key: "unpublished",        label: "Dépubliées" },
+                  { key: "rejected",           label: "Refusées" },
+                  { key: "sold",               label: "Vendues" },
+                ] as { key: string; label: string }[]).map(f => (
+                  <button key={f.key}
+                    onClick={() => setListingsStatusFilter(f.key)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
+                    style={{
+                      background: listingsStatusFilter === f.key ? "#0B1A2B" : "rgba(11,26,43,0.06)",
+                      color: listingsStatusFilter === f.key ? "#00D084" : "#0B1A2B",
+                    }}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
               {listings.length === 0
                 ? <p className="text-center py-12 text-sm" style={{ color: "#8A99AA" }}>Aucune annonce.</p>
                 : listings.map(l => (
