@@ -105,16 +105,21 @@ class PaymentService
         $data = $response->json();
 
         Log::info('PayPlus verifyPayment', [
-            'token'       => $invoiceToken,
-            'http_status' => $response->status(),
-            'body'        => $data,
+            'token'         => $invoiceToken,
+            'http_status'   => $response->status(),
+            'response_code' => $data['response_code'] ?? null,
+            'description'   => $data['description'] ?? null,
+            'body'          => $data,
         ]);
 
-        if (!$response->successful() || ($data['response_code'] ?? '') !== '00') {
+        if (!$response->successful()) {
+            Log::warning('PayPlus verifyPayment HTTP error', ['status' => $response->status()]);
             return false;
         }
 
-        // PayPlus peut retourner "completed", "Completed", "success"…
-        return strtolower($data['description'] ?? '') === 'completed';
+        // On se fie uniquement à "description" — PayPlus retourne "completed" quand le paiement est passé.
+        // On n'exige pas response_code === "00" car il peut varier selon le statut de la transaction.
+        $description = strtolower($data['description'] ?? '');
+        return in_array($description, ['completed', 'success']);
     }
 }
