@@ -100,7 +100,7 @@ class PaymentService
         $response = Http::withHeaders([
             'Apikey'        => config('services.payplus.api_key'),
             'Authorization' => 'Bearer ' . config('services.payplus.token'),
-        ])->post('https://app.payplus.africa/pay/v01/redirect/checkout-invoice/confirm/?invoiceToken=' . $invoiceToken);
+        ])->get('https://app.payplus.africa/pay/v01/redirect/checkout-invoice/confirm/?invoiceToken=' . $invoiceToken);
 
         $data = $response->json();
 
