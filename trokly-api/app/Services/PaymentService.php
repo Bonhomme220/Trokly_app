@@ -95,6 +95,72 @@ class PaymentService
         ];
     }
 
+    /**
+     * Crée une facture PayPlus pour le boost TOP uniquement (500 FCFA).
+     * Utilisé quand la publication est couverte par un crédit mais le boost reste payant.
+     */
+    public function createBoostPaymentLink(Listing $listing, string $returnUrl, string $cancelUrl): array
+    {
+        $amount      = self::BOOST_PRICE; // 500 FCFA
+        $callbackUrl = rtrim(config('app.url'), '/') . '/api/payments/webhook';
+        $frontUrl    = rtrim(config('app.frontend_url', 'https://trokly.bj'), '/');
+
+        $payload = [
+            'commande' => [
+                'invoice' => [
+                    'items' => [[
+                        'name'        => 'Option TOP — annonce en tête des résultats',
+                        'description' => "{$listing->iphone_model} {$listing->capacity}Go",
+                        'quantity'    => 1,
+                        'unit_price'  => $amount,
+                        'total_price' => $amount,
+                    ]],
+                    'total_amount' => $amount,
+                    'devise'       => 'xof',
+                    'description'  => 'Trokly — Option TOP boost',
+                ],
+                'store' => [
+                    'name'        => 'Trokly',
+                    'website_url' => $frontUrl,
+                ],
+                'actions' => [
+                    'cancel_url'   => $cancelUrl,
+                    'return_url'   => $returnUrl,
+                    'callback_url' => $callbackUrl,
+                ],
+                'custom_data' => [
+                    'listing_id' => (string) $listing->id,
+                    'boost_only' => 'true',
+                ],
+            ],
+        ];
+
+        $response = Http::withHeaders([
+            'Apikey'        => config('services.payplus.api_key'),
+            'Authorization' => 'Bearer ' . config('services.payplus.token'),
+            'Accept'        => 'application/json',
+            'Content-Type'  => 'application/json',
+        ])->post('https://app.payplus.africa/pay/v01/redirect/checkout-invoice/create', $payload);
+
+        $data = $response->json();
+
+        if (!$response->successful() || ($data['response_code'] ?? '') !== '00') {
+            Log::error('PayPlus createBoostPaymentLink failed', ['body' => $data]);
+            throw new \RuntimeException($data['description'] ?? 'Impossible d\'initier le paiement du boost.');
+        }
+
+        $invoiceToken = $data['token'];
+
+        // On réutilise payment_reference pour stocker le token du boost
+        $listing->update(['payment_reference' => $invoiceToken]);
+
+        return [
+            'payment_url' => $data['response_text'],
+            'token'       => $invoiceToken,
+            'amount'      => $amount,
+        ];
+    }
+
     public function verifyPayment(string $invoiceToken): bool
     {
         $response = Http::withHeaders([

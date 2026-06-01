@@ -88,6 +88,13 @@ class PaymentController extends Controller
         }
 
         if ($listing->payment_status === 'paid') {
+            // Cas boost-only : annonce déjà publiée via crédit, boost en attente de paiement
+            if (!$listing->is_boosted && $listing->payment_reference) {
+                $paid = $this->paymentService->verifyPayment($listing->payment_reference);
+                if ($paid) {
+                    $listing->update(['is_boosted' => true]);
+                }
+            }
             return response()->json(['message' => 'Already processed.']);
         }
 
@@ -115,6 +122,14 @@ class PaymentController extends Controller
         }
 
         if ($listing->payment_status === 'paid') {
+            // Cas boost-only : annonce publiée via crédit, boost en attente de paiement
+            if (!$listing->is_boosted && $listing->payment_reference) {
+                $paid = $this->paymentService->verifyPayment($listing->payment_reference);
+                if ($paid) {
+                    $listing->update(['is_boosted' => true]);
+                    return response()->json(['message' => 'Boost confirmé.', 'listing' => $listing->fresh()]);
+                }
+            }
             return response()->json(['message' => 'Déjà payé.', 'listing' => $listing]);
         }
 

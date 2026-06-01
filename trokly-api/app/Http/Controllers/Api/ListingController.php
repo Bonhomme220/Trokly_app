@@ -114,7 +114,8 @@ class ListingController extends Controller
                 'asking_price'    => $request->asking_price,
                 'whatsapp_number' => $request->whatsapp_number,
                 'plan'            => $request->plan,
-                'is_boosted'      => $request->boolean('is_boosted'),
+                // Le boost TOP n'est pas inclus dans le crédit de publication (payant séparément)
+                'is_boosted'      => $usedCredit ? false : $request->boolean('is_boosted'),
                 'sale_type'       => 'marketplace',
                 'accepts_trade'   => false,
                 'payment_status'  => $usedCredit ? 'paid' : 'pending_payment',
@@ -135,6 +136,22 @@ class ListingController extends Controller
             }
 
             if ($usedCredit) {
+                // Si le boost TOP a été demandé, il reste payant même avec un crédit
+                if ($request->boolean('is_boosted')) {
+                    $frontUrl  = config('app.frontend_url', 'https://trokly.bj');
+                    $returnUrl = "{$frontUrl}/listings/payment/success?listing_id={$listing->id}";
+                    $cancelUrl = "{$frontUrl}/listings/payment/cancel?listing_id={$listing->id}";
+                    $paymentData = app(PaymentService::class)->createBoostPaymentLink($listing, $returnUrl, $cancelUrl);
+
+                    return response()->json([
+                        'message'       => 'Annonce publiée avec votre crédit. Procédez au paiement du boost TOP.',
+                        'listing'       => $listing->load('photos'),
+                        'used_credit'   => true,
+                        'boost_pending' => true,
+                        'payment_url'   => $paymentData['payment_url'],
+                    ], 201);
+                }
+
                 return response()->json([
                     'message'     => 'Annonce publiée avec votre crédit.',
                     'listing'     => $listing->load('photos'),
