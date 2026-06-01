@@ -28,11 +28,11 @@ class PaymentController extends Controller
 
         $seller = $request->user();
 
-        // Utiliser un crédit si disponible
+        // Utiliser un crédit si disponible (republication = 10 jours)
         if ($seller->listing_credits > 0) {
             DB::transaction(function () use ($seller, $listing) {
                 $seller->decrement('listing_credits');
-                $this->confirmPayment($listing);
+                $this->confirmPayment($listing, true);
             });
 
             return response()->json([
@@ -50,7 +50,8 @@ class PaymentController extends Controller
         return response()->json($data);
     }
 
-    // Webhook appelé par PayPlus après paiement
+    // Republication via crédit (listing déjà existant)
+
     public function webhook(Request $request): JsonResponse
     {
         // Logger tout le payload pour debug
@@ -148,7 +149,7 @@ class PaymentController extends Controller
         return response()->json(['message' => 'Paiement confirmé.', 'listing' => $listing->fresh()]);
     }
 
-    private function confirmPayment(Listing $listing): void
+    private function confirmPayment(Listing $listing, bool $paidViaCredit = false): void
     {
         $newStatus = match ($listing->plan) {
             'basic'           => 'published',
@@ -156,10 +157,14 @@ class PaymentController extends Controller
             'verified_seller' => 'pending_expertise',
         };
 
+        // Publication gratuite via crédit = 10 jours ; paiement réel = 30 jours
+        $durationDays = $paidViaCredit ? 10 : 30;
+
         $listing->update([
             'payment_status' => 'paid',
+            'paid_via_credit' => $paidViaCredit,
             'status'         => $newStatus,
-            'expires_at'     => now()->addDays(30),
+            'expires_at'     => now()->addDays($durationDays),
         ]);
 
         // ── Commission ambassadeur si code utilisé ──────────────────────

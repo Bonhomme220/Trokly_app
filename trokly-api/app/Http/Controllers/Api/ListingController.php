@@ -77,10 +77,11 @@ class ListingController extends Controller
             'description'     => 'nullable|string|max:1000',
             'asking_price'    => 'required|integer|min:1000',
             'whatsapp_number' => ['required', 'string', 'max:20', 'regex:/^\+\d{6,15}$/'],
-            'plan'            => 'required|in:basic,verified_phone,verified_seller',
-            'is_boosted'      => 'boolean',
-            'photos'          => 'required|array|min:1',
-            'photos.*'        => 'url',
+            'plan'                    => 'required|in:basic,verified_phone,verified_seller',
+            'is_boosted'              => 'boolean',
+            'use_credit_as_discount'  => 'boolean', // Crédit valorisé 499 FCFA sur plan supérieur
+            'photos'                  => 'required|array|min:1',
+            'photos.*'                => 'url',
         ]);
 
         // Pour vendeur vérifié, KYC obligatoire
@@ -96,12 +97,26 @@ class ListingController extends Controller
         $seller = $request->user();
 
         return DB::transaction(function () use ($request, $seller) {
-            // Utiliser un crédit uniquement pour le plan basic (499 FCFA)
-            $usedCredit = false;
+            $usedCredit     = false;
+            $creditUpgrade  = false; // Crédit valorisé 499 FCFA sur plan supérieur (utilisateur paie la différence)
+
             if ($seller->listing_credits > 0 && $request->plan === 'basic') {
+                // Publication 100% gratuite via crédit (10 jours)
                 $seller->decrement('listing_credits');
                 $usedCredit = true;
+            } elseif ($seller->listing_credits > 0
+                && $request->boolean('use_credit_as_discount')
+                && in_array($request->plan, ['verified_phone', 'verified_seller'])
+            ) {
+                // Crédit valorisé 499 FCFA de réduction sur un plan supérieur, le reste est payé via PayPlus
+                $seller->decrement('listing_credits');
+                $creditUpgrade = true;
             }
+
+            // Réduction finale : réduction ambassadeur OU 499 FCFA crédit upgrade (pas les deux)
+            $discountAmount = $creditUpgrade
+                ? 499
+                : $request->integer('discount_amount', 0);
 
             $listing = Listing::create([
                 'seller_id'       => $seller->id,
@@ -114,16 +129,17 @@ class ListingController extends Controller
                 'asking_price'    => $request->asking_price,
                 'whatsapp_number' => $request->whatsapp_number,
                 'plan'            => $request->plan,
-                // Le boost TOP n'est pas inclus dans le crédit de publication (payant séparément)
+                // Le boost TOP n'est pas inclus dans le crédit gratuit (payant séparément)
                 'is_boosted'      => $usedCredit ? false : $request->boolean('is_boosted'),
                 'sale_type'       => 'marketplace',
                 'accepts_trade'   => false,
                 'payment_status'  => $usedCredit ? 'paid' : 'pending_payment',
                 'paid_via_credit' => $usedCredit,
-                'status'          => $usedCredit ? ($request->plan === 'basic' ? 'published' : 'pending_expertise') : 'draft',
-                'expires_at'      => $usedCredit ? now()->addDays(30) : null,
+                // Publication gratuite (crédit) = 10 jours seulement
+                'status'          => $usedCredit ? 'published' : 'draft',
+                'expires_at'      => $usedCredit ? now()->addDays(10) : null,
                 'ambassador_code' => $request->ambassador_code ?: null,
-                'discount_amount' => $request->integer('discount_amount', 0),
+                'discount_amount' => $discountAmount,
             ]);
 
             foreach ($request->photos as $index => $url) {
