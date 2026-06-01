@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import PhotoUpload from "@/components/ui/PhotoUpload";
 import { CONDITION_LABELS, CONDITION_OPTIONS } from "@/lib/utils";
-import { BadgeCheck, Zap, MessageCircle, Check, AlertTriangle, ChevronRight, Tag, Loader2 } from "lucide-react";
+import { BadgeCheck, Zap, MessageCircle, Check, AlertTriangle, ChevronRight, Tag, Loader2, X } from "lucide-react";
 import Link from "next/link";
 
 const IPHONE_MODELS = [
@@ -88,6 +88,7 @@ export default function NewListingPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [upsellModal, setUpsellModal] = useState(false);
 
   // Ambassador code
   const [ambassadorCode, setAmbassadorCode] = useState("");
@@ -108,8 +109,6 @@ export default function NewListingPage() {
   const discountAmount = ambassadorInfo ? Math.round(basePrice * ambassadorInfo.discount_percent / 100) : 0;
   const totalPrice = basePrice - discountAmount;
   const hasCredit = (user?.listing_credits ?? 0) > 0 && plan === "basic";
-  // Avec crédit : plan gratuit, mais le boost reste payant à 500 FCFA
-  const creditBoostPrice = hasCredit && boosted ? 500 : 0;
 
   async function applyAmbassadorCode() {
     const code = ambassadorCode.trim().toUpperCase();
@@ -134,16 +133,35 @@ export default function NewListingPage() {
     setAmbassadorError("");
   }
 
+  function validateForm(): string | null {
+    const filledPhotos = form.photos.filter(Boolean);
+    if (!form.iphone_model)           return "Choisissez le modèle.";
+    if (!form.color)                  return "Choisissez la couleur.";
+    if (!form.asking_price)           return "Entrez le prix demandé.";
+    if (!form.whatsapp_number.trim()) return "Entrez votre numéro WhatsApp.";
+    if (!/^\+\d{6,15}$/.test(form.whatsapp_number.replace(/\s/g, ''))) return "Le numéro WhatsApp doit inclure l'indicatif pays (ex: +22901XXXXXXXX).";
+    if (filledPhotos.length < 3)      return "Ajoutez au moins 3 photos.";
+    return null;
+  }
+
   async function submit() {
     setError("");
-    const filledPhotos = form.photos.filter(Boolean);
-    if (!form.iphone_model)           return setError("Choisissez le modèle.");
-    if (!form.color)                  return setError("Choisissez la couleur.");
-    if (!form.asking_price)           return setError("Entrez le prix demandé.");
-    if (!form.whatsapp_number.trim()) return setError("Entrez votre numéro WhatsApp.");
-    if (!/^\+\d{6,15}$/.test(form.whatsapp_number.replace(/\s/g, ''))) return setError("Le numéro WhatsApp doit inclure l'indicatif pays (ex: +22901XXXXXXXX).");
-    if (filledPhotos.length < 3)      return setError("Ajoutez au moins 3 photos.");
+    const validationError = validateForm();
+    if (validationError) return setError(validationError);
 
+    // Si crédit disponible et plan basic sans boost → proposer l'upsell avant de soumettre
+    if (hasCredit && !boosted) {
+      setUpsellModal(true);
+      return;
+    }
+
+    await doSubmit(plan, false);
+  }
+
+  async function doSubmit(targetPlan: string, useCreditAsDiscount: boolean) {
+    setUpsellModal(false);
+    setError("");
+    const filledPhotos = form.photos.filter(Boolean);
     setSubmitting(true);
     try {
       const res = await api.post("/listings", {
@@ -151,15 +169,21 @@ export default function NewListingPage() {
         capacity: parseInt(form.capacity),
         asking_price: parseInt(form.asking_price),
         photos: filledPhotos,
-        plan,
+        plan: targetPlan,
         is_boosted: boosted,
         sale_type: "marketplace",
         accepts_trade: false,
-        ...(ambassadorInfo ? { ambassador_code: ambassadorInfo.code, discount_amount: discountAmount } : {}),
+        use_credit_as_discount: useCreditAsDiscount,
+        // Réduction : crédit upgrade (499 FCFA) OU code ambassadeur (pas les deux)
+        ...(useCreditAsDiscount
+          ? { discount_amount: 499 }
+          : ambassadorInfo
+          ? { ambassador_code: ambassadorInfo.code, discount_amount: discountAmount }
+          : {}),
       });
 
       if (res.data.used_credit && res.data.payment_url) {
-        // Crédit utilisé pour le plan, mais boost TOP payant → PayPlus pour 500 FCFA
+        // Crédit pour le plan + boost TOP facturé via PayPlus
         window.location.href = res.data.payment_url;
         return;
       }
@@ -405,9 +429,14 @@ export default function NewListingPage() {
           </div>
 
           {hasCredit && (
-            <div className="mt-3 p-3 rounded-xl flex items-center gap-2 text-xs font-medium"
-              style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
-              🎁 Vous avez {user?.listing_credits} crédit{(user?.listing_credits ?? 0) > 1 ? "s" : ""} de publication — {boosted ? "plan offert, boost TOP (500 FCFA) facturé séparément." : "paiement offert pour cette annonce."}
+            <div className="mt-3 p-3 rounded-xl text-xs font-medium space-y-1"
+              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", color: "#B8860B" }}>
+              <p>🎁 Vous avez {user?.listing_credits} crédit{(user?.listing_credits ?? 0) > 1 ? "s" : ""} de publication.</p>
+              <p style={{ color: "#8A99AA", fontWeight: 400 }}>
+                {boosted
+                  ? "Plan offert (10 jours) · Boost TOP (500 FCFA) facturé séparément."
+                  : "⚠️ Annonce active 10 jours seulement avec un crédit (au lieu de 30 jours avec un paiement normal)."}
+              </p>
             </div>
           )}
           {(user?.listing_credits ?? 0) > 0 && plan !== "basic" && (
@@ -544,10 +573,109 @@ export default function NewListingPage() {
         )}
 
         <p className="text-xs text-center pb-4" style={{ color: "#8A99AA" }}>
-          Votre annonce sera active 30 jours.
+          {hasCredit && !boosted
+            ? "Votre annonce sera active 10 jours avec le crédit."
+            : "Votre annonce sera active 30 jours."}
           {plan === "basic" ? " Publication immédiate après paiement." : " Expertise requise avant publication."}
         </p>
       </div>
+
+      {/* ── Modal upsell crédit ── */}
+      {upsellModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+          style={{ background: "rgba(11,26,43,0.55)" }}
+          onClick={e => { if (e.target === e.currentTarget) setUpsellModal(false); }}>
+          <div className="w-full max-w-md rounded-2xl p-6 space-y-4"
+            style={{ background: "white" }}>
+
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-bold text-lg" style={{ color: "#0B1A2B" }}>
+                  Profitez de votre crédit… ou faites mieux ?
+                </h2>
+                <p className="text-sm mt-1" style={{ color: "#8A99AA" }}>
+                  Votre crédit publie gratuitement, mais seulement <strong style={{ color: "#B8860B" }}>10 jours</strong>.
+                  En payant un plan supérieur, votre crédit vous offre <strong>499 FCFA</strong> de réduction, et vous gagnez 30 jours + la confiance des acheteurs.
+                </p>
+              </div>
+              <button onClick={() => setUpsellModal(false)} className="flex-shrink-0 mt-0.5">
+                <X size={18} style={{ color: "#8A99AA" }} />
+              </button>
+            </div>
+
+            {/* Option 1 : Continuer avec le crédit */}
+            <button
+              onClick={() => doSubmit("basic", false)}
+              className="w-full p-4 rounded-xl border-2 text-left transition-all"
+              style={{ borderColor: "rgba(11,26,43,0.12)", background: "white" }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>Continuer avec le crédit</p>
+                  <p className="text-xs mt-0.5" style={{ color: "#8A99AA" }}>Annonce active 10 jours · Publication immédiate</p>
+                </div>
+                <span className="font-black text-base" style={{ color: "#00B070" }}>Gratuit</span>
+              </div>
+            </button>
+
+            {/* Option 2 : iPhone vérifié */}
+            <button
+              onClick={() => doSubmit("verified_phone", true)}
+              disabled={submitting}
+              className="w-full p-4 rounded-xl border-2 text-left transition-all"
+              style={{ borderColor: "#00B070", background: "rgba(0,176,112,0.04)" }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <BadgeCheck size={14} style={{ color: "#00B070" }} />
+                    <p className="font-bold text-sm" style={{ color: "#0B1A2B" }}>iPhone vérifié</p>
+                    <span className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+                      style={{ background: "rgba(0,176,112,0.12)", color: "#00B070" }}>Recommandé</span>
+                  </div>
+                  <p className="text-xs" style={{ color: "#8A99AA" }}>
+                    30 jours · Expertise physique · Badge iPhone vérifié · Les acheteurs font +3× plus confiance
+                  </p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-black text-base" style={{ color: "#0B1A2B" }}>1 000 FCFA</p>
+                  <p className="text-xs line-through" style={{ color: "#8A99AA" }}>1 499 FCFA</p>
+                  <p className="text-xs font-semibold" style={{ color: "#00B070" }}>−499 FCFA crédit</p>
+                </div>
+              </div>
+            </button>
+
+            {/* Option 3 : Vendeur vérifié */}
+            <button
+              onClick={() => doSubmit("verified_seller", true)}
+              disabled={submitting}
+              className="w-full p-4 rounded-xl border-2 text-left transition-all"
+              style={{ borderColor: "#0B1A2B", background: "rgba(11,26,43,0.02)" }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <BadgeCheck size={14} style={{ color: "#0B1A2B" }} />
+                    <p className="font-bold text-sm" style={{ color: "#0B1A2B" }}>Vendeur vérifié</p>
+                  </div>
+                  <p className="text-xs" style={{ color: "#8A99AA" }}>
+                    30 jours · KYC + expertise · Badge sur votre profil · Fidélisez vos acheteurs
+                  </p>
+                  {user?.kyc?.status !== "approved" && (
+                    <p className="text-xs mt-1 font-medium" style={{ color: "#B8860B" }}>
+                      ⚠️ KYC requis — <a href="/kyc" className="underline">vérifier mon identité</a>
+                    </p>
+                  )}
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="font-black text-base" style={{ color: "#0B1A2B" }}>2 500 FCFA</p>
+                  <p className="text-xs line-through" style={{ color: "#8A99AA" }}>2 999 FCFA</p>
+                  <p className="text-xs font-semibold" style={{ color: "#00B070" }}>−499 FCFA crédit</p>
+                </div>
+              </div>
+            </button>
+
+          </div>
+        </div>
+      )}
     </main>
   );
 }
