@@ -108,6 +108,8 @@ export default function NewListingPage() {
   const discountAmount = ambassadorInfo ? Math.round(basePrice * ambassadorInfo.discount_percent / 100) : 0;
   const totalPrice = basePrice - discountAmount;
   const hasCredit = (user?.listing_credits ?? 0) > 0 && plan === "basic";
+  // Avec crédit : plan gratuit, mais le boost reste payant à 500 FCFA
+  const creditBoostPrice = hasCredit && boosted ? 500 : 0;
 
   async function applyAmbassadorCode() {
     const code = ambassadorCode.trim().toUpperCase();
@@ -156,6 +158,11 @@ export default function NewListingPage() {
         ...(ambassadorInfo ? { ambassador_code: ambassadorInfo.code, discount_amount: discountAmount } : {}),
       });
 
+      if (res.data.used_credit && res.data.payment_url) {
+        // Crédit utilisé pour le plan, mais boost TOP payant → PayPlus pour 500 FCFA
+        window.location.href = res.data.payment_url;
+        return;
+      }
       if (res.data.used_credit) {
         router.push("/seller?listing_published=1");
         return;
@@ -378,11 +385,20 @@ export default function NewListingPage() {
                 </p>
               )}
               <p className="text-xl font-black" style={{ color: "#0B1A2B" }}>
-                {hasCredit ? "Gratuit" : `${totalPrice.toLocaleString("fr-FR")} FCFA`}
+                {hasCredit && !boosted
+                  ? "Gratuit"
+                  : hasCredit && boosted
+                  ? `${(500).toLocaleString("fr-FR")} FCFA`
+                  : `${totalPrice.toLocaleString("fr-FR")} FCFA`}
               </p>
-              {hasCredit && (
+              {hasCredit && !boosted && (
                 <p className="text-xs" style={{ color: "#8A99AA" }}>
-                  (valeur {basePrice.toLocaleString("fr-FR")} FCFA)
+                  (valeur {selectedPlan.price.toLocaleString("fr-FR")} FCFA)
+                </p>
+              )}
+              {hasCredit && boosted && (
+                <p className="text-xs" style={{ color: "#8A99AA" }}>
+                  plan offert · boost TOP facturé
                 </p>
               )}
             </div>
@@ -391,7 +407,7 @@ export default function NewListingPage() {
           {hasCredit && (
             <div className="mt-3 p-3 rounded-xl flex items-center gap-2 text-xs font-medium"
               style={{ background: "rgba(0,208,132,0.1)", color: "#00B070" }}>
-              🎁 Vous avez {user?.listing_credits} crédit{(user?.listing_credits ?? 0) > 1 ? "s" : ""} de publication — paiement offert pour cette annonce.
+              🎁 Vous avez {user?.listing_credits} crédit{(user?.listing_credits ?? 0) > 1 ? "s" : ""} de publication — {boosted ? "plan offert, boost TOP (500 FCFA) facturé séparément." : "paiement offert pour cette annonce."}
             </div>
           )}
           {(user?.listing_credits ?? 0) > 0 && plan !== "basic" && (
@@ -515,8 +531,10 @@ export default function NewListingPage() {
         )}
 
         <Button size="lg" className="w-full" loading={submitting} onClick={submit}>
-          {hasCredit
+          {hasCredit && !boosted
             ? "Publier gratuitement (crédit)"
+            : hasCredit && boosted
+            ? "Publier avec crédit + payer le boost TOP — 500 FCFA"
             : `Continuer vers le paiement — ${totalPrice.toLocaleString("fr-FR")} FCFA`}
         </Button>
         {ambassadorInfo && !hasCredit && (
