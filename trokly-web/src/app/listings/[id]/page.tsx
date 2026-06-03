@@ -9,7 +9,7 @@ import Badge from "@/components/ui/Badge";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Eye, Shield, ChevronLeft, ChevronRight, MessageCircle,
-  CheckCircle, XCircle, Battery, BadgeCheck,
+  CheckCircle, XCircle, Battery, BadgeCheck, AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -315,6 +315,32 @@ export default function ListingDetailPage() {
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Mise en garde annonce non vérifiée ── */}
+          {listing.plan === "basic" && !isOwner && (
+            <div className="mb-4 rounded-xl p-4 space-y-2"
+              style={{ background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.25)" }}>
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={15} style={{ color: "#B8860B", flexShrink: 0 }} />
+                <p className="text-sm font-semibold" style={{ color: "#B8860B" }}>
+                  Téléphone non vérifié par Trokly
+                </p>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: "#8A99AA" }}>
+                Cette annonce n&apos;a pas fait l&apos;objet d&apos;une expertise physique par notre équipe.
+                Nous ne pouvons pas garantir l&apos;état réel de l&apos;appareil.
+                Pour plus de sécurité, privilégiez les annonces avec le badge{" "}
+                <span style={{ color: "#00B070", fontWeight: 600 }}>iPhone vérifié</span>.
+              </p>
+              <Link
+                href="/?plan=verified_phone"
+                className="inline-flex items-center gap-1 text-xs font-semibold"
+                style={{ color: "#00B070" }}>
+                <BadgeCheck size={12} />
+                Voir les annonces iPhone vérifié →
+              </Link>
             </div>
           )}
 
