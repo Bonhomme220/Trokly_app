@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -56,6 +57,22 @@ export default function RootLayout({
           {children}
           <Footer />
         </AuthProvider>
+
+        {/* WhatsPAY Pixel de Conversion */}
+        <Script id="whatspay-pixel" strategy="afterInteractive">{`
+(function() {
+  var ref = new URLSearchParams(window.location.search).get('wp_ref');
+  if (ref) localStorage.setItem('wp_ref', ref);
+  var r = localStorage.getItem('wp_ref');
+  var page = encodeURIComponent(window.location.pathname);
+  if (r) new Image().src = 'https://whatspay.africa/api/pixel/31b0611e-2588-48f3-aa73-8564ff347495?event=page_view&ref=' + r + '&page=' + page;
+  window.wpTrackConversion = function(event) {
+    var r2 = localStorage.getItem('wp_ref');
+    new Image().src = 'https://whatspay.africa/api/pixel/31b0611e-2588-48f3-aa73-8564ff347495?event=' + (event || 'purchase') + (r2 ? '&ref=' + r2 : '') + '&page=' + page;
+  };
+})();
+        `}</Script>
+        {/* Fin WhatsPAY Pixel */}
       </body>
     </html>
   );

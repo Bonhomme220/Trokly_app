@@ -67,6 +67,8 @@ function RegisterForm() {
         full_name: fullName,
       });
       await login(res.data.token);
+      // WhatsPAY pixel — conversion inscription
+      window.wpTrackConversion?.("signup");
       setStep("welcome"); // ← afficher le modal avant de rediriger
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string } } };

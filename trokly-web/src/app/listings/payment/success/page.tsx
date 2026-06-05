@@ -30,6 +30,8 @@ function SuccessContent() {
           const s = res.data.listing?.status;
           if (s === "published" || s === "pending_expertise") {
             setStatus("confirmed");
+            // WhatsPAY pixel — conversion paiement
+            window.wpTrackConversion?.("purchase");
           } else if (n < MAX_ATTEMPTS) {
             setAttempt(n + 1);
             setTimeout(() => check(n + 1), DELAY_MS);
