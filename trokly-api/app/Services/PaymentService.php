@@ -96,6 +96,72 @@ class PaymentService
     }
 
     /**
+     * Crée une facture PayPlus pour les options d'un abonnement Pro.
+     * Le plan de base est couvert par l'abonnement ; on facture iPhone vérifié (+1499) et/ou boost (+500).
+     */
+    public function createSubscriptionOptionsLink(
+        Listing $listing,
+        int $amount,
+        string $returnUrl,
+        string $cancelUrl
+    ): array {
+        $callbackUrl = rtrim(config('app.url'), '/') . '/api/payments/webhook';
+        $frontUrl    = rtrim(config('app.frontend_url', 'https://trokly.bj'), '/');
+
+        $parts = [];
+        if ($listing->plan === 'verified_phone') $parts[] = 'iPhone vérifié';
+        if ($amount === 500 || $amount === 1999)  $parts[] = 'TOP boost';
+        $desc = implode(' + ', $parts) ?: 'Options Pro';
+
+        $payload = [
+            'commande' => [
+                'invoice' => [
+                    'items' => [[
+                        'name'        => "Trokly Pro — {$desc}",
+                        'description' => "{$listing->iphone_model} {$listing->capacity}Go",
+                        'quantity'    => 1,
+                        'unit_price'  => $amount,
+                        'total_price' => $amount,
+                    ]],
+                    'total_amount' => $amount,
+                    'devise'       => 'xof',
+                    'description'  => "Trokly Pro — {$desc}",
+                ],
+                'store'   => ['name' => 'Trokly', 'website_url' => $frontUrl],
+                'actions' => [
+                    'cancel_url'   => $cancelUrl,
+                    'return_url'   => $returnUrl,
+                    'callback_url' => $callbackUrl,
+                ],
+                'custom_data' => [
+                    'listing_id'          => (string) $listing->id,
+                    'type'                => 'subscription_options',
+                    'sub_iphone'          => $listing->plan === 'verified_phone' ? 'true' : 'false',
+                    'sub_boost'           => ($amount === 500 || $amount === 1999) ? 'true' : 'false',
+                ],
+            ],
+        ];
+
+        $response = \Illuminate\Support\Facades\Http::withHeaders([
+            'Apikey'        => config('services.payplus.api_key'),
+            'Authorization' => 'Bearer ' . config('services.payplus.token'),
+            'Accept'        => 'application/json',
+            'Content-Type'  => 'application/json',
+        ])->post('https://app.payplus.africa/pay/v01/redirect/checkout-invoice/create', $payload);
+
+        $data = $response->json();
+
+        if (!$response->successful() || ($data['response_code'] ?? '') !== '00') {
+            Log::error('PayPlus createSubscriptionOptionsLink failed', ['body' => $data]);
+            throw new \RuntimeException('Impossible d\'initier le paiement des options.');
+        }
+
+        $listing->update(['payment_reference' => $data['token']]);
+
+        return ['payment_url' => $data['response_text'], 'token' => $data['token'], 'amount' => $amount];
+    }
+
+    /**
      * Crée une facture PayPlus pour le boost TOP uniquement (500 FCFA).
      * Utilisé quand la publication est couverte par un crédit mais le boost reste payant.
      */

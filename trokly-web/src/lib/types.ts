@@ -59,6 +59,16 @@ export interface QuickSaleDecision {
   decided_at: string;
 }
 
+export interface Subscription {
+  id: number;
+  user_id: number;
+  status: "active" | "expired";
+  started_at: string;
+  expires_at: string;
+  payment_reference?: string;
+  amount: number;
+}
+
 export interface Listing {
   id: number;
   seller_id: number;
@@ -79,6 +89,8 @@ export interface Listing {
   is_boosted?: boolean;
   whatsapp_number?: string;
   payment_status?: "pending_payment" | "paid";
+  paid_via_subscription?: boolean;
+  subscription_id?: number;
   expires_at?: string;
   sold_at?: string;
   status: ListingStatus;

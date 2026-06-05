@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check, Zap, BadgeCheck, MessageCircle, Shield, ChevronRight } from "lucide-react";
+import { Check, Zap, BadgeCheck, MessageCircle, Shield, ChevronRight, Crown } from "lucide-react";
 
 const PLANS = [
   {
@@ -77,6 +77,60 @@ export default function TarifsPage() {
           la transaction se fait directement avec l'acheteur sur WhatsApp.
         </p>
       </div>
+
+      {/* Abonnement Pro */}
+      <div className="rounded-2xl overflow-hidden mb-10"
+        style={{ border: "2px solid rgba(0,208,132,0.4)", boxShadow: "0 6px 32px rgba(0,0,0,0.1)" }}>
+        <div className="p-6 flex flex-col md:flex-row items-center gap-6" style={{ background: "#0B1A2B" }}>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown size={16} style={{ color: "#00D084" }} />
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                style={{ background: "rgba(0,208,132,0.15)", color: "#00D084" }}>
+                ABONNEMENT PRO — NOUVEAU
+              </span>
+            </div>
+            <h2 className="text-xl font-black mb-1" style={{ color: "white" }}>
+              Annonces illimitées pendant 30 jours
+            </h2>
+            <p className="text-sm mb-3" style={{ color: "rgba(247,245,240,0.5)" }}>
+              Un abonnement mensuel couvre toutes vos publications. Badge Vendeur vérifié automatique.
+              iPhone vérifié et TOP boost disponibles en option sur chaque annonce.
+            </p>
+            <ul className="flex flex-wrap gap-x-4 gap-y-1">
+              {[
+                "Annonces illimitées",
+                "Badge Vendeur vérifié",
+                "Option iPhone vérifié (+1 499 F)",
+                "Option TOP boost (+500 F)",
+              ].map(f => (
+                <li key={f} className="flex items-center gap-1.5 text-xs"
+                  style={{ color: "rgba(247,245,240,0.7)" }}>
+                  <Check size={11} style={{ color: "#00D084", flexShrink: 0 }} /> {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex flex-col items-center gap-3 flex-shrink-0">
+            <div className="text-center">
+              <span className="text-4xl font-black font-mono" style={{ color: "#00D084" }}>4 999</span>
+              <span className="text-sm font-bold ml-1" style={{ color: "rgba(247,245,240,0.5)" }}>FCFA</span>
+              <p className="text-xs mt-0.5" style={{ color: "rgba(247,245,240,0.35)" }}>par mois</p>
+            </div>
+            <Link href="/abonnement"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap"
+              style={{ background: "#00D084", color: "#0B1A2B" }}>
+              <Crown size={14} /> Voir l'abonnement Pro
+            </Link>
+          </div>
+        </div>
+        <div className="px-6 py-3 text-xs" style={{ background: "rgba(0,208,132,0.06)", color: "#00B070" }}>
+          💡 Idéal si vous vendez plus d'un iPhone par mois — rentable dès la 2ème annonce.
+        </div>
+      </div>
+
+      {/* Plans à l'unité */}
+      <h2 className="text-xl font-bold mb-5 text-center" style={{ color: "#0B1A2B" }}>Ou publiez à l'unité</h2>
 
       {/* Plans */}
       <div className="grid md:grid-cols-3 gap-5 mb-10">

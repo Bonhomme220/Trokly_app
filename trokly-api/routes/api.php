@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\Admin\AdminLitigationController;
 use App\Http\Controllers\Api\Admin\AdminDashboardController;
 use App\Http\Controllers\Api\Admin\AdminAmbassadorController;
 use App\Http\Controllers\Api\AmbassadorController;
+use App\Http\Controllers\Api\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 // Leads pré-lancement (public)
@@ -68,6 +69,13 @@ Route::middleware('auth:sanctum')->group(function () {
     // Paiement annonces
     Route::post('payments/{listing}/initiate', [PaymentController::class, 'initiate']);
     Route::get('payments/verify', [PaymentController::class, 'verify']);
+
+    // Abonnement Pro
+    Route::prefix('subscription')->group(function () {
+        Route::get('me', [SubscriptionController::class, 'me']);
+        Route::post('initiate', [SubscriptionController::class, 'initiate']);
+        Route::post('verify', [SubscriptionController::class, 'verify']);
+    });
 
     // Mes annonces
     Route::get('my/listings', [ListingController::class, 'myListings']);

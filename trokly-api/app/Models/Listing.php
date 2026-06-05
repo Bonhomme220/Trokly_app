@@ -28,6 +28,8 @@ class Listing extends Model
         'expires_at',
         'payment_status',
         'paid_via_credit',
+        'subscription_id',
+        'paid_via_subscription',
         'payment_reference',
         'sold_at',
         'quality_grade',
@@ -42,7 +44,8 @@ class Listing extends Model
         return [
             'accepts_trade'   => 'boolean',
             'is_boosted'      => 'boolean',
-            'paid_via_credit' => 'boolean',
+            'paid_via_credit'        => 'boolean',
+        'paid_via_subscription'  => 'boolean',
             'asking_price'    => 'integer',
             'discount_amount' => 'integer',
             'ai_suggested_price' => 'integer',
@@ -56,6 +59,11 @@ class Listing extends Model
     public function seller(): BelongsTo
     {
         return $this->belongsTo(User::class, 'seller_id');
+    }
+
+    public function subscription(): BelongsTo
+    {
+        return $this->belongsTo(Subscription::class);
     }
 
     public function photos(): HasMany

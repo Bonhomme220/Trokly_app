@@ -10,9 +10,10 @@ import { Listing, PaginatedResponse } from "@/lib/types";
 import { formatDate, formatPrice } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
+import { Subscription } from "@/lib/types";
 import {
   Package, TrendingUp, Eye, Plus, Clock, CheckCircle,
-  BadgeCheck, CreditCard, Zap, EyeOff, CheckSquare, Gift, Tag, Pencil, RefreshCw
+  BadgeCheck, CreditCard, Zap, EyeOff, CheckSquare, Gift, Tag, Pencil, RefreshCw, Crown, ChevronRight
 } from "lucide-react";
 
 type Tab = "overview" | "listings";
@@ -38,6 +39,7 @@ function SellerDashboardInner() {
   const [successMsg, setSuccessMsg] = useState(searchParams.get("listing_published") ? "Annonce publiée avec succès !" : "");
   const [isAmbassador, setIsAmbassador] = useState(false);
   const [ambassadorCode, setAmbassadorCode] = useState<string | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) router.push("/login");
@@ -52,6 +54,9 @@ function SellerDashboardInner() {
         setAmbassadorCode(r.data.code);
       }
     }).catch(() => {});
+    api.get<{ subscription: Subscription | null }>("/subscription/me")
+      .then(r => setSubscription(r.data.subscription))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
 
@@ -167,6 +172,48 @@ function SellerDashboardInner() {
                 Code : <strong style={{ color: "#0B1A2B", letterSpacing: "0.05em" }}>{ambassadorCode}</strong> · Voir mes commissions →
               </p>
             </div>
+          </div>
+        </Link>
+      )}
+
+      {/* Abonnement Pro */}
+      {subscription?.status === "active" ? (
+        <Link href="/abonnement">
+          <div className="mb-6 p-4 rounded-xl flex items-center gap-3 transition-all hover:opacity-90 cursor-pointer"
+            style={{ background: "#0B1A2B", border: "none" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(0,208,132,0.15)" }}>
+              <Crown size={16} style={{ color: "#00D084" }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold" style={{ color: "white" }}>
+                Abonnement Pro actif 🎉
+              </p>
+              <p className="text-xs" style={{ color: "rgba(247,245,240,0.5)" }}>
+                Expire le {new Date(subscription.expires_at).toLocaleDateString("fr-FR")} · Annonces illimitées
+              </p>
+            </div>
+            <span className="text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0"
+              style={{ background: "rgba(0,208,132,0.15)", color: "#00D084" }}>
+              PRO
+            </span>
+          </div>
+        </Link>
+      ) : (
+        <Link href="/abonnement">
+          <div className="mb-6 p-4 rounded-xl flex items-center gap-3 transition-all hover:opacity-90 cursor-pointer"
+            style={{ background: "rgba(11,26,43,0.03)", border: "1px solid rgba(11,26,43,0.08)" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(11,26,43,0.07)" }}>
+              <Crown size={16} style={{ color: "#0B1A2B" }} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold" style={{ color: "#0B1A2B" }}>Passer à Trokly Pro</p>
+              <p className="text-xs" style={{ color: "#8A99AA" }}>
+                4 999 FCFA/mois · Annonces illimitées + badge Vendeur vérifié
+              </p>
+            </div>
+            <ChevronRight size={15} style={{ color: "#8A99AA" }} />
           </div>
         </Link>
       )}

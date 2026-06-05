@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Api\SubscriptionController;
 use App\Models\AmbassadorCode;
 use App\Models\Listing;
 use App\Services\AmbassadorService;
@@ -72,6 +73,52 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Missing token.'], 400);
         }
 
+        // ── Paiement abonnement Pro ───────────────────────────────────────────
+        $customType = $request->input('customdata.type')
+            ?? $request->input('custom_data.type')
+            ?? $request->input('type');
+
+        if ($customType === 'subscription') {
+            $userId = (int) ($request->input('customdata.user_id')
+                ?? $request->input('custom_data.user_id')
+                ?? $request->input('user_id'));
+
+            if (!$userId) {
+                return response()->json(['message' => 'Missing user_id.'], 400);
+            }
+
+            $paid = $this->paymentService->verifyPayment($invoiceToken);
+
+            if (!$paid) {
+                return response()->json(['message' => 'Payment not confirmed.'], 422);
+            }
+
+            SubscriptionController::activateSubscription($userId, $invoiceToken);
+            return response()->json(['message' => 'OK']);
+        }
+
+        // ── Options abonnement Pro ────────────────────────────────────────────
+        if ($customType === 'subscription_options') {
+            $listingId = $request->input('customdata.listing_id')
+                ?? $request->input('custom_data.listing_id')
+                ?? $request->input('listing_id');
+
+            $listing = $listingId ? Listing::find($listingId) : null;
+
+            if (!$listing) {
+                return response()->json(['message' => 'Listing not found.'], 404);
+            }
+
+            $paid = $this->paymentService->verifyPayment($invoiceToken);
+            if (!$paid) {
+                return response()->json(['message' => 'Payment not confirmed.'], 422);
+            }
+
+            $this->confirmSubscriptionOptions($listing, $request, $invoiceToken);
+            return response()->json(['message' => 'OK']);
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         $listing = Listing::where('payment_reference', $invoiceToken)->first();
 
         if (!$listing) {
@@ -122,18 +169,6 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Non autorisé.'], 403);
         }
 
-        if ($listing->payment_status === 'paid') {
-            // Cas boost-only : annonce publiée via crédit, boost en attente de paiement
-            if (!$listing->is_boosted && $listing->payment_reference) {
-                $paid = $this->paymentService->verifyPayment($listing->payment_reference);
-                if ($paid) {
-                    $listing->update(['is_boosted' => true]);
-                    return response()->json(['message' => 'Boost confirmé.', 'listing' => $listing->fresh()]);
-                }
-            }
-            return response()->json(['message' => 'Déjà payé.', 'listing' => $listing]);
-        }
-
         if (!$listing->payment_reference) {
             return response()->json(['message' => 'Aucune référence de paiement.'], 422);
         }
@@ -144,9 +179,60 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Paiement non confirmé.'], 422);
         }
 
+        // ── Options abonnement Pro ────────────────────────────────────────
+        if ($listing->paid_via_subscription) {
+            $this->confirmSubscriptionOptions($listing, $request, $listing->payment_reference);
+            return response()->json(['message' => 'Options confirmées.', 'listing' => $listing->fresh()]);
+        }
+        // ─────────────────────────────────────────────────────────────────
+
+        if ($listing->payment_status === 'paid') {
+            // Cas boost-only : annonce publiée via crédit, boost en attente de paiement
+            if (!$listing->is_boosted) {
+                $listing->update(['is_boosted' => true]);
+                return response()->json(['message' => 'Boost confirmé.', 'listing' => $listing->fresh()]);
+            }
+            return response()->json(['message' => 'Déjà payé.', 'listing' => $listing]);
+        }
+
         $this->confirmPayment($listing);
 
         return response()->json(['message' => 'Paiement confirmé.', 'listing' => $listing->fresh()]);
+    }
+
+    /**
+     * Confirme les options payantes d'un abonnement Pro (iPhone vérifié et/ou boost TOP).
+     * Appelé depuis webhook() et verify() quand paid_via_subscription = true.
+     */
+    private function confirmSubscriptionOptions(Listing $listing, Request $request, string $invoiceToken): void
+    {
+        // Récupérer sub_iphone / sub_boost depuis custom_data (webhook) ou depuis le listing (verify)
+        $subIphone = $request->input('customdata.sub_iphone')
+            ?? $request->input('custom_data.sub_iphone');
+        $subBoost  = $request->input('customdata.sub_boost')
+            ?? $request->input('custom_data.sub_boost');
+
+        // Fallback : déduire depuis le plan et le montant stockés si on n'a pas les custom_data
+        if ($subIphone === null) {
+            $subIphone = $listing->plan === 'verified_phone' ? 'true' : 'false';
+        }
+        if ($subBoost === null) {
+            $subBoost = 'false'; // on ne peut pas deviner sans custom_data
+        }
+
+        $needsExpertise = ($subIphone === 'true');
+        $applyBoost     = ($subBoost === 'true');
+
+        // expires_at = min(subscription.expires_at, now() + 30 jours)
+        $sub = $listing->subscription;
+        $thirtyDays = now()->addDays(30);
+        $expiresAt  = $sub ? $sub->expires_at->min($thirtyDays) : $thirtyDays;
+
+        $listing->update([
+            'status'     => $needsExpertise ? 'pending_expertise' : 'published',
+            'is_boosted' => $applyBoost,
+            'expires_at' => $expiresAt,
+        ]);
     }
 
     private function confirmPayment(Listing $listing, bool $paidViaCredit = false): void

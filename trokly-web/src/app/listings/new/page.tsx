@@ -8,8 +8,9 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import PhotoUpload from "@/components/ui/PhotoUpload";
 import { CONDITION_LABELS, CONDITION_OPTIONS } from "@/lib/utils";
-import { BadgeCheck, Zap, MessageCircle, Check, AlertTriangle, ChevronRight, Tag, Loader2, X } from "lucide-react";
+import { BadgeCheck, Zap, MessageCircle, Check, AlertTriangle, ChevronRight, Tag, Loader2, X, Crown } from "lucide-react";
 import Link from "next/link";
+import { Subscription } from "@/lib/types";
 
 const IPHONE_MODELS = [
   "iPhone 6", "iPhone 6 Plus",
@@ -89,6 +90,8 @@ export default function NewListingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [upsellModal, setUpsellModal] = useState(false);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subLoading, setSubLoading] = useState(true);
 
   // Ambassador code
   const [ambassadorCode, setAmbassadorCode] = useState("");
@@ -100,15 +103,34 @@ export default function NewListingPage() {
     if (!loading && !isAuthenticated) router.push("/register?next=/listings/new");
   }, [loading, isAuthenticated, router]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    api.get<{ subscription: Subscription | null }>("/subscription/me")
+      .then(r => {
+        const s = r.data.subscription;
+        setSubscription(s);
+        if (s?.status === "active") setPlan("verified_seller");
+      })
+      .catch(() => {})
+      .finally(() => setSubLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
   function setField(key: string, value: unknown) {
     setForm(f => ({ ...f, [key]: value }));
   }
 
+  const isSubscriber = subscription?.status === "active";
   const selectedPlan = PLANS.find(p => p.id === plan)!;
   const basePrice = selectedPlan.price + (boosted ? 500 : 0);
   const discountAmount = ambassadorInfo ? Math.round(basePrice * ambassadorInfo.discount_percent / 100) : 0;
   const totalPrice = basePrice - discountAmount;
-  const hasCredit = (user?.listing_credits ?? 0) > 0 && plan === "basic";
+  const hasCredit = (user?.listing_credits ?? 0) > 0 && plan === "basic" && !isSubscriber;
+
+  // Prix pour abonné Pro : base gratuite, options payantes
+  const subOptionPrice = isSubscriber
+    ? (plan === "verified_phone" ? 1499 : 0) + (boosted ? 500 : 0)
+    : 0;
 
   async function applyAmbassadorCode() {
     const code = ambassadorCode.trim().toUpperCase();
@@ -150,7 +172,7 @@ export default function NewListingPage() {
     if (validationError) return setError(validationError);
 
     // Si crédit disponible et plan basic sans boost → proposer l'upsell avant de soumettre
-    if (hasCredit && !boosted) {
+    if (hasCredit && !boosted && !isSubscriber) {
       setUpsellModal(true);
       return;
     }
@@ -182,6 +204,15 @@ export default function NewListingPage() {
           : {}),
       });
 
+      // Abonnement Pro : publication gratuite ou options payantes
+      if (res.data.published_via_subscription) {
+        router.push("/seller?listing_published=1");
+        return;
+      }
+      if (res.data.options_payment && res.data.payment_url) {
+        window.location.href = res.data.payment_url;
+        return;
+      }
       if (res.data.used_credit && res.data.payment_url) {
         // Crédit pour le plan + boost TOP facturé via PayPlus
         window.location.href = res.data.payment_url;
@@ -207,7 +238,7 @@ export default function NewListingPage() {
     }
   }
 
-  if (loading) return null;
+  if (loading || subLoading) return null;
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-8">
@@ -222,17 +253,68 @@ export default function NewListingPage() {
 
         {/* ── 1. Formule ── */}
         <div className="card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold" style={{ color: "#0B1A2B" }}>Choisissez votre formule</h2>
-            <Link href="/tarifs" target="_blank"
-              className="text-xs font-medium flex items-center gap-1"
-              style={{ color: "#00B070" }}>
-              Voir les détails <ChevronRight size={11} />
-            </Link>
-          </div>
 
-          <div className="space-y-2">
-            {PLANS.map(p => {
+          {/* ─── Mode Abonné Pro ─────────────────────────────── */}
+          {isSubscriber ? (
+            <>
+              {/* Bandeau Pro */}
+              <div className="flex items-center gap-3 mb-4 p-3 rounded-xl"
+                style={{ background: "#0B1A2B" }}>
+                <Crown size={16} style={{ color: "#00D084" }} />
+                <div className="flex-1">
+                  <p className="text-sm font-bold" style={{ color: "white" }}>Abonnement Pro actif</p>
+                  <p className="text-xs" style={{ color: "rgba(247,245,240,0.5)" }}>
+                    Badge Vendeur vérifié inclus · Expire le {new Date(subscription!.expires_at).toLocaleDateString("fr-FR")}
+                  </p>
+                </div>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(0,208,132,0.15)", color: "#00D084" }}>PRO</span>
+              </div>
+
+              {/* Option iPhone vérifié */}
+              <p className="text-sm font-semibold mb-2" style={{ color: "#0B1A2B" }}>Options pour cette annonce</p>
+              <button
+                className="w-full p-4 rounded-xl border-2 text-left transition-all mb-2"
+                style={{
+                  borderColor: plan === "verified_phone" ? "#00B070" : "rgba(11,26,43,0.1)",
+                  background: plan === "verified_phone" ? "rgba(0,176,112,0.05)" : "white",
+                }}
+                onClick={() => setPlan(p => p === "verified_phone" ? "verified_seller" : "verified_phone")}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: plan === "verified_phone" ? "rgba(0,176,112,0.15)" : "rgba(11,26,43,0.06)" }}>
+                      <BadgeCheck size={14} style={{ color: plan === "verified_phone" ? "#00B070" : "#8A99AA" }} />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm flex items-center gap-2" style={{ color: "#0B1A2B" }}>
+                        iPhone vérifié
+                        <span className="text-xs font-normal" style={{ color: "#8A99AA" }}>— optionnel</span>
+                      </p>
+                      <p className="text-xs" style={{ color: "#8A99AA" }}>Expertise physique · Badge iPhone vérifié sur l'annonce</p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-black text-base" style={{ color: plan === "verified_phone" ? "#00B070" : "#0B1A2B" }}>+1 499</p>
+                    <p className="text-xs" style={{ color: "#8A99AA" }}>FCFA</p>
+                  </div>
+                </div>
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold" style={{ color: "#0B1A2B" }}>Choisissez votre formule</h2>
+                <Link href="/tarifs" target="_blank"
+                  className="text-xs font-medium flex items-center gap-1"
+                  style={{ color: "#00B070" }}>
+                  Voir les détails <ChevronRight size={11} />
+                </Link>
+              </div>
+
+              <div className="space-y-2">
+              {PLANS.map(p => {
               const selected = plan === p.id;
               return (
                 <button key={p.id} onClick={() => setPlan(p.id)}
@@ -312,7 +394,9 @@ export default function NewListingPage() {
                 </button>
               );
             })}
-          </div>
+              </div>
+            </>
+          )}
 
           {/* Boost TOP */}
           <button
@@ -346,8 +430,8 @@ export default function NewListingPage() {
             </div>
           </button>
 
-          {/* Code ambassadeur */}
-          <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(11,26,43,0.08)" }}>
+          {/* Code ambassadeur — non disponible pour les abonnés */}
+          {!isSubscriber && <div className="mt-3 pt-3" style={{ borderTop: "1px solid rgba(11,26,43,0.08)" }}>
             {ambassadorInfo ? (
               <div className="flex items-center justify-between p-3 rounded-xl"
                 style={{ background: "rgba(0,208,132,0.1)", border: "1px solid rgba(0,208,132,0.3)" }}>
@@ -396,39 +480,55 @@ export default function NewListingPage() {
                 )}
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Total */}
           <div className="mt-4 pt-4 flex items-center justify-between"
             style={{ borderTop: "1px solid rgba(11,26,43,0.08)" }}>
             <p className="text-sm font-medium" style={{ color: "#8A99AA" }}>Total à payer</p>
             <div className="text-right">
-              {ambassadorInfo && !hasCredit && (
-                <p className="text-xs line-through" style={{ color: "#8A99AA" }}>
-                  {basePrice.toLocaleString("fr-FR")} FCFA
-                </p>
+              {/* Abonné Pro */}
+              {isSubscriber && (
+                <>
+                  <p className="text-xl font-black" style={{ color: "#0B1A2B" }}>
+                    {subOptionPrice === 0 ? "Gratuit" : `${subOptionPrice.toLocaleString("fr-FR")} FCFA`}
+                  </p>
+                  <p className="text-xs" style={{ color: "#8A99AA" }}>
+                    {subOptionPrice === 0 ? "inclus dans l'abonnement" : "options payantes"}
+                  </p>
+                </>
               )}
-              <p className="text-xl font-black" style={{ color: "#0B1A2B" }}>
-                {hasCredit && !boosted
-                  ? "Gratuit"
-                  : hasCredit && boosted
-                  ? `${(500).toLocaleString("fr-FR")} FCFA`
-                  : `${totalPrice.toLocaleString("fr-FR")} FCFA`}
-              </p>
-              {hasCredit && !boosted && (
-                <p className="text-xs" style={{ color: "#8A99AA" }}>
-                  (valeur {selectedPlan.price.toLocaleString("fr-FR")} FCFA)
-                </p>
-              )}
-              {hasCredit && boosted && (
-                <p className="text-xs" style={{ color: "#8A99AA" }}>
-                  plan offert · boost TOP facturé
-                </p>
+              {/* Non-abonné */}
+              {!isSubscriber && (
+                <>
+                  {ambassadorInfo && !hasCredit && (
+                    <p className="text-xs line-through" style={{ color: "#8A99AA" }}>
+                      {basePrice.toLocaleString("fr-FR")} FCFA
+                    </p>
+                  )}
+                  <p className="text-xl font-black" style={{ color: "#0B1A2B" }}>
+                    {hasCredit && !boosted
+                      ? "Gratuit"
+                      : hasCredit && boosted
+                      ? `${(500).toLocaleString("fr-FR")} FCFA`
+                      : `${totalPrice.toLocaleString("fr-FR")} FCFA`}
+                  </p>
+                  {hasCredit && !boosted && (
+                    <p className="text-xs" style={{ color: "#8A99AA" }}>
+                      (valeur {selectedPlan.price.toLocaleString("fr-FR")} FCFA)
+                    </p>
+                  )}
+                  {hasCredit && boosted && (
+                    <p className="text-xs" style={{ color: "#8A99AA" }}>
+                      plan offert · boost TOP facturé
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>
 
-          {hasCredit && (
+          {!isSubscriber && hasCredit && (
             <div className="mt-3 p-3 rounded-xl text-xs font-medium space-y-1"
               style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", color: "#B8860B" }}>
               <p>🎁 Vous avez {user?.listing_credits} crédit{(user?.listing_credits ?? 0) > 1 ? "s" : ""} de publication.</p>
@@ -439,7 +539,7 @@ export default function NewListingPage() {
               </p>
             </div>
           )}
-          {(user?.listing_credits ?? 0) > 0 && plan !== "basic" && (
+          {!isSubscriber && (user?.listing_credits ?? 0) > 0 && plan !== "basic" && (
             <div className="mt-3 p-3 rounded-xl flex items-center gap-2 text-xs font-medium"
               style={{ background: "rgba(245,158,11,0.1)", color: "#B8860B" }}>
               🎁 Vos crédits de publication s&apos;appliquent uniquement au plan <strong>Basic (499 FCFA)</strong>.
@@ -560,23 +660,30 @@ export default function NewListingPage() {
         )}
 
         <Button size="lg" className="w-full" loading={submitting} onClick={submit}>
-          {hasCredit && !boosted
+          {isSubscriber
+            ? subOptionPrice === 0
+              ? "Publier gratuitement (abonnement Pro)"
+              : `Payer les options — ${subOptionPrice.toLocaleString("fr-FR")} FCFA`
+            : hasCredit && !boosted
             ? "Publier gratuitement (crédit)"
             : hasCredit && boosted
             ? "Publier avec crédit + payer le boost TOP — 500 FCFA"
             : `Continuer vers le paiement — ${totalPrice.toLocaleString("fr-FR")} FCFA`}
         </Button>
-        {ambassadorInfo && !hasCredit && (
+        {!isSubscriber && ambassadorInfo && !hasCredit && (
           <p className="text-xs text-center -mt-2" style={{ color: "#00B070" }}>
             🎁 Code <strong>{ambassadorInfo.code}</strong> : −{ambassadorInfo.discount_percent}% appliqué ({discountAmount.toLocaleString("fr-FR")} FCFA économisés)
           </p>
         )}
 
         <p className="text-xs text-center pb-4" style={{ color: "#8A99AA" }}>
-          {hasCredit && !boosted
+          {isSubscriber
+            ? "Annonce active jusqu'à expiration de votre abonnement."
+            : hasCredit && !boosted
             ? "Votre annonce sera active 10 jours avec le crédit."
             : "Votre annonce sera active 30 jours."}
-          {plan === "basic" ? " Publication immédiate après paiement." : " Expertise requise avant publication."}
+          {!isSubscriber && (plan === "basic" ? " Publication immédiate après paiement." : " Expertise requise avant publication.")}
+          {isSubscriber && plan === "verified_phone" && " Expertise physique requise."}
         </p>
       </div>
 

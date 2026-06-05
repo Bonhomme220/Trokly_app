@@ -97,6 +97,80 @@ class ListingController extends Controller
         $seller = $request->user();
 
         return DB::transaction(function () use ($request, $seller) {
+
+            // ── Abonnement Pro ───────────────────────────────────────────────────
+            $activeSub = $seller->activeSubscription();
+
+            if ($activeSub) {
+                $plan      = $request->plan; // 'verified_seller' (inclus) ou 'verified_phone' (+1499)
+                $isBoosted = $request->boolean('is_boosted');
+
+                $optionAmount = 0;
+                if ($plan === 'verified_phone') $optionAmount += 1499;
+                if ($isBoosted)                 $optionAmount += 500;
+                $freePublication = ($optionAmount === 0);
+
+                $thirtyDays = now()->addDays(30);
+                $expiresAt  = $freePublication
+                    ? $activeSub->expires_at->min($thirtyDays)
+                    : null; // sera fixé après confirmation du paiement des options
+
+                $listing = Listing::create([
+                    'seller_id'             => $seller->id,
+                    'iphone_model'          => $request->iphone_model,
+                    'capacity'              => $request->capacity,
+                    'color'                 => $request->color,
+                    'condition'             => $request->condition,
+                    'imei'                  => $request->imei ?: null,
+                    'description'           => $request->description,
+                    'asking_price'          => $request->asking_price,
+                    'whatsapp_number'       => $request->whatsapp_number,
+                    'plan'                  => $plan,
+                    'is_boosted'            => false,
+                    'sale_type'             => 'marketplace',
+                    'accepts_trade'         => false,
+                    'payment_status'        => 'paid',
+                    'paid_via_subscription' => true,
+                    'subscription_id'       => $activeSub->id,
+                    'status'                => $freePublication ? 'published' : 'draft',
+                    'expires_at'            => $expiresAt,
+                ]);
+
+                foreach ($request->photos as $index => $url) {
+                    ListingPhoto::create([
+                        'listing_id' => $listing->id,
+                        'url'        => $url,
+                        'type'       => 'seller',
+                        'order'      => $index,
+                    ]);
+                }
+
+                if ($freePublication) {
+                    return response()->json([
+                        'published_via_subscription' => true,
+                        'listing'                    => $listing->load('photos'),
+                    ], 201);
+                }
+
+                // Options payantes — iPhone vérifié (+1499) et/ou boost TOP (+500)
+                $frontUrl  = config('app.frontend_url', 'https://trokly.bj');
+                $returnUrl = "{$frontUrl}/listings/payment/success?listing_id={$listing->id}";
+                $cancelUrl = "{$frontUrl}/listings/payment/cancel?listing_id={$listing->id}";
+
+                $paymentData = app(PaymentService::class)->createSubscriptionOptionsLink(
+                    $listing, $optionAmount, $returnUrl, $cancelUrl
+                );
+
+                return response()->json([
+                    'published_via_subscription' => false,
+                    'options_payment'            => true,
+                    'listing'                    => $listing->load('photos'),
+                    'payment_url'                => $paymentData['payment_url'],
+                    'amount'                     => $optionAmount,
+                ], 201);
+            }
+            // ────────────────────────────────────────────────────────────────────
+
             $usedCredit     = false;
             $creditUpgrade  = false; // Crédit valorisé 499 FCFA sur plan supérieur (utilisateur paie la différence)
 
