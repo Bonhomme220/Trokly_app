@@ -79,7 +79,6 @@ class ListingController extends Controller
             'whatsapp_number' => ['required', 'string', 'max:20', 'regex:/^\+\d{6,15}$/'],
             'plan'                    => 'required|in:basic,verified_phone,verified_seller',
             'is_boosted'              => 'boolean',
-            'use_credit_as_discount'  => 'boolean', // Crédit valorisé 499 FCFA sur plan supérieur
             'photos'                  => 'required|array|min:1',
             'photos.*'                => 'url',
         ]);
@@ -171,23 +170,19 @@ class ListingController extends Controller
             }
             // ────────────────────────────────────────────────────────────────────
 
-            $usedCredit     = false;
-            $creditUpgrade  = false; // Crédit valorisé 499 FCFA sur plan supérieur (utilisateur paie la différence)
+            // Le crédit gratuit d'inscription ne sert QUE de remise de 499 FCFA sur un
+            // plan supérieur (le vendeur paie la différence). Aucune publication
+            // gratuite : une annonce Basic reste payante au tarif plein.
+            $creditUpgrade = false;
 
-            if ($seller->listing_credits > 0 && $request->plan === 'basic') {
-                // Publication 100% gratuite via crédit (10 jours)
-                $seller->decrement('listing_credits');
-                $usedCredit = true;
-            } elseif ($seller->listing_credits > 0
-                && $request->boolean('use_credit_as_discount')
+            if ($seller->listing_credits > 0
                 && in_array($request->plan, ['verified_phone', 'verified_seller'])
             ) {
-                // Crédit valorisé 499 FCFA de réduction sur un plan supérieur, le reste est payé via PayPlus
                 $seller->decrement('listing_credits');
                 $creditUpgrade = true;
             }
 
-            // Réduction finale : réduction ambassadeur OU 499 FCFA crédit upgrade (pas les deux)
+            // Réduction finale : 499 FCFA crédit OU réduction ambassadeur (jamais les deux)
             $discountAmount = $creditUpgrade
                 ? 499
                 : $request->integer('discount_amount', 0);
@@ -203,16 +198,14 @@ class ListingController extends Controller
                 'asking_price'    => $request->asking_price,
                 'whatsapp_number' => $request->whatsapp_number,
                 'plan'            => $request->plan,
-                // Le boost TOP n'est pas inclus dans le crédit gratuit (payant séparément)
-                'is_boosted'      => $usedCredit ? false : $request->boolean('is_boosted'),
+                'is_boosted'      => $request->boolean('is_boosted'),
                 'sale_type'       => 'marketplace',
                 'accepts_trade'   => false,
-                'payment_status'  => $usedCredit ? 'paid' : 'pending_payment',
-                'paid_via_credit' => $usedCredit,
-                // Publication gratuite (crédit) = 10 jours seulement
-                'status'          => $usedCredit ? 'published' : 'draft',
-                'expires_at'      => $usedCredit ? now()->addDays(10) : null,
-                'ambassador_code' => $request->ambassador_code ?: null,
+                'payment_status'  => 'pending_payment',
+                'status'          => 'draft',
+                'expires_at'      => null,
+                // Le crédit et le code ambassadeur ne se cumulent pas
+                'ambassador_code' => $creditUpgrade ? null : ($request->ambassador_code ?: null),
                 'discount_amount' => $discountAmount,
             ]);
 
@@ -223,30 +216,6 @@ class ListingController extends Controller
                     'type'       => 'seller',
                     'order'      => $index,
                 ]);
-            }
-
-            if ($usedCredit) {
-                // Si le boost TOP a été demandé, il reste payant même avec un crédit
-                if ($request->boolean('is_boosted')) {
-                    $frontUrl  = config('app.frontend_url', 'https://trokly.bj');
-                    $returnUrl = "{$frontUrl}/listings/payment/success?listing_id={$listing->id}";
-                    $cancelUrl = "{$frontUrl}/listings/payment/cancel?listing_id={$listing->id}";
-                    $paymentData = app(PaymentService::class)->createBoostPaymentLink($listing, $returnUrl, $cancelUrl);
-
-                    return response()->json([
-                        'message'       => 'Annonce publiée avec votre crédit. Procédez au paiement du boost TOP.',
-                        'listing'       => $listing->load('photos'),
-                        'used_credit'   => true,
-                        'boost_pending' => true,
-                        'payment_url'   => $paymentData['payment_url'],
-                    ], 201);
-                }
-
-                return response()->json([
-                    'message'     => 'Annonce publiée avec votre crédit.',
-                    'listing'     => $listing->load('photos'),
-                    'used_credit' => true,
-                ], 201);
             }
 
             // Générer le lien de paiement

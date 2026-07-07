@@ -281,7 +281,7 @@ export default function TarifsPage() {
         {[
           { icon: Shield,        title: "Aucune commission",      desc: "Vous vendez au prix que vous fixez. Trokly ne prend rien sur la transaction." },
           { icon: MessageCircle, title: "Contact direct",         desc: "L'acheteur vous contacte directement sur WhatsApp. Aucun intermédiaire." },
-          { icon: BadgeCheck,    title: "Crédit si rejet",        desc: "Si votre iPhone n'est pas accepté à l'expertise, vous recevez un crédit pour republier gratuitement." },
+          { icon: BadgeCheck,    title: "Crédit si rejet",        desc: "Si votre iPhone n'est pas accepté à l'expertise, vous recevez un crédit de 499 FCFA à valoir sur une annonce iPhone vérifié ou Vendeur vérifié." },
         ].map(({ icon: Icon, title, desc }) => (
           <div key={title} className="rounded-2xl p-5 flex gap-4"
             style={{ background: "#F7F5F0", border: "1px solid rgba(11,26,43,0.07)" }}>
@@ -308,7 +308,7 @@ export default function TarifsPage() {
             },
             {
               q: "Que se passe-t-il si mon iPhone est refusé à l'expertise ?",
-              a: "Votre annonce n'est pas publiée, mais vous recevez automatiquement un crédit de republication. Ce crédit vous permet de déposer une nouvelle annonce gratuitement.",
+              a: "Votre annonce n'est pas publiée, mais vous recevez automatiquement un crédit de 499 FCFA. Ce crédit se déduit du prix d'une annonce iPhone vérifié ou Vendeur vérifié : vous ne réglez que la différence.",
             },
             {
               q: "Quelle est la différence entre « iPhone vérifié » et « Vendeur vérifié » ?",
@@ -320,7 +320,7 @@ export default function TarifsPage() {
             },
             {
               q: "Combien de temps dure mon annonce ?",
-              a: "30 jours à partir de la date de publication. Passé ce délai, elle est automatiquement dépubliée. Vous pouvez la republier en payant une nouvelle fois (ou en utilisant un crédit si vous en avez).",
+              a: "30 jours à partir de la date de publication. Passé ce délai, elle est automatiquement dépubliée. Vous pouvez la republier en payant une nouvelle fois.",
             },
           ].map(({ q, a }) => (
             <div key={q} className="rounded-2xl p-5" style={{ background: "#F7F5F0", border: "1px solid rgba(11,26,43,0.07)" }}>

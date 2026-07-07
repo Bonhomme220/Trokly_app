@@ -113,11 +113,11 @@ function RegisterForm() {
             </div>
             <div>
               <p className="font-bold text-sm mb-0.5" style={{ color: "#0B1A2B" }}>
-                1 crédit de publication offert 🎁
+                1 crédit offert 🎁
               </p>
               <p className="text-xs leading-relaxed" style={{ color: "#6B7280" }}>
-                Votre première annonce est <strong>gratuite</strong> — pas besoin de payer.
-                Déposez votre iPhone maintenant et profitez-en.
+                <strong>−499 FCFA</strong> sur votre première annonce iPhone vérifié ou Vendeur vérifié :
+                vous ne payez que la différence. Déposez votre iPhone maintenant et profitez-en.
               </p>
             </div>
           </div>
@@ -126,7 +126,7 @@ function RegisterForm() {
           <div className="card p-4 mb-5 space-y-2.5">
             {[
               { icon: "📱", text: "Déposez votre iPhone en 5 minutes" },
-              { icon: "✅", text: "Publication immédiate, sans paiement" },
+              { icon: "✅", text: "Votre crédit réduit une annonce vérifiée de 499 FCFA" },
               { icon: "💬", text: "Les acheteurs vous contactent sur WhatsApp" },
             ].map(({ icon, text }) => (
               <div key={text} className="flex items-center gap-3">

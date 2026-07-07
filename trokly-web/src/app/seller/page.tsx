@@ -106,11 +106,6 @@ function SellerDashboardInner() {
     setActionLoading(listing.id);
     try {
       const res = await api.post(`/payments/${listing.id}/initiate`);
-      if (res.data.used_credit) {
-        setSuccessMsg("Annonce publiée gratuitement avec votre crédit !");
-        loadListings();
-        return;
-      }
       if (res.data.payment_url) window.location.href = res.data.payment_url;
     } catch {
       // ignore
@@ -218,17 +213,17 @@ function SellerDashboardInner() {
         </Link>
       )}
 
-      {/* Crédit republication */}
+      {/* Crédit offert */}
       {credits > 0 && (
         <div className="mb-6 p-4 rounded-xl flex items-center gap-3"
           style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}>
           <Gift size={18} style={{ color: "#F59E0B" }} />
           <div>
             <p className="text-sm font-semibold" style={{ color: "#0B1A2B" }}>
-              {credits} crédit{credits > 1 ? "s" : ""} de republication disponible{credits > 1 ? "s" : ""}
+              {credits} crédit{credits > 1 ? "s" : ""} offert{credits > 1 ? "s" : ""} disponible{credits > 1 ? "s" : ""}
             </p>
             <p className="text-xs" style={{ color: "#8A99AA" }}>
-              Sera utilisé automatiquement lors de votre prochaine annonce.
+              −499 FCFA sur une annonce iPhone vérifié ou Vendeur vérifié : vous ne payez que la différence.
             </p>
           </div>
         </div>
@@ -295,9 +290,7 @@ function SellerDashboardInner() {
                           <p className="text-xs" style={{ color: "#8A99AA" }}>{formatPrice(l.asking_price)}</p>
                         </div>
                         <Button size="sm" loading={actionLoading === l.id} onClick={() => relaunchPayment(l)}>
-                          {credits > 0
-                            ? <><Gift size={13} /> Publier gratuitement</>
-                            : <><CreditCard size={13} /> Payer</>}
+                          <CreditCard size={13} /> Payer
                         </Button>
                       </div>
                     ))}
@@ -346,9 +339,7 @@ function SellerDashboardInner() {
                     {/* Paiement requis */}
                     {l.status === "draft" && l.payment_status === "pending_payment" && (
                       <Button size="sm" loading={actionLoading === l.id} onClick={() => relaunchPayment(l)}>
-                        {credits > 0
-                          ? <><Gift size={13} /> Publier gratuitement</>
-                          : <><CreditCard size={13} /> Finaliser le paiement</>}
+                        <CreditCard size={13} /> Finaliser le paiement
                       </Button>
                     )}
                     {/* Expertise en attente — info */}

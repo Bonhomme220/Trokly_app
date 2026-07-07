@@ -27,21 +27,10 @@ class PaymentController extends Controller
             return response()->json(['message' => 'Cette annonce est déjà payée.'], 422);
         }
 
-        $seller = $request->user();
-
-        // Utiliser un crédit si disponible (republication = 10 jours)
-        if ($seller->listing_credits > 0) {
-            DB::transaction(function () use ($seller, $listing) {
-                $seller->decrement('listing_credits');
-                $this->confirmPayment($listing, true);
-            });
-
-            return response()->json([
-                'used_credit' => true,
-                'message'     => 'Annonce publiée avec votre crédit.',
-            ]);
-        }
-
+        // Le crédit gratuit ne finance jamais une publication : la remise éventuelle
+        // (499 FCFA sur un plan supérieur) a déjà été appliquée à la création de
+        // l'annonce. On régénère simplement le lien de paiement (le montant tient
+        // compte de discount_amount déjà enregistré).
         $frontUrl  = config('app.frontend_url', 'https://trokly.bj');
         $returnUrl = "{$frontUrl}/listings/payment/success?listing_id={$listing->id}";
         $cancelUrl = "{$frontUrl}/listings/payment/cancel?listing_id={$listing->id}";

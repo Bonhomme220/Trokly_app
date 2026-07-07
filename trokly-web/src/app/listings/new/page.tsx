@@ -8,7 +8,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import PhotoUpload from "@/components/ui/PhotoUpload";
 import { CONDITION_LABELS, CONDITION_OPTIONS } from "@/lib/utils";
-import { BadgeCheck, Zap, MessageCircle, Check, AlertTriangle, ChevronRight, Tag, Loader2, X, Crown } from "lucide-react";
+import { BadgeCheck, Zap, MessageCircle, Check, AlertTriangle, ChevronRight, Tag, Loader2, Crown } from "lucide-react";
 import Link from "next/link";
 import { Subscription } from "@/lib/types";
 
@@ -89,7 +89,6 @@ export default function NewListingPage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [upsellModal, setUpsellModal] = useState(false);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [subLoading, setSubLoading] = useState(true);
 
@@ -123,9 +122,19 @@ export default function NewListingPage() {
   const isSubscriber = subscription?.status === "active";
   const selectedPlan = PLANS.find(p => p.id === plan)!;
   const basePrice = selectedPlan.price + (boosted ? 500 : 0);
-  const discountAmount = ambassadorInfo ? Math.round(basePrice * ambassadorInfo.discount_percent / 100) : 0;
-  const totalPrice = basePrice - discountAmount;
-  const hasCredit = (user?.listing_credits ?? 0) > 0 && plan === "basic" && !isSubscriber;
+
+  // Le crédit gratuit d'inscription ne sert que de remise de 499 FCFA sur un plan
+  // supérieur (le vendeur paie la différence). Il ne publie jamais un Basic gratuitement.
+  const creditCount = user?.listing_credits ?? 0;
+  const useCreditDiscount = creditCount > 0 && !isSubscriber && plan !== "basic";
+  const creditDiscount = useCreditDiscount ? 499 : 0;
+
+  // Réduction : crédit (499) prioritaire, sinon code ambassadeur (jamais les deux)
+  const ambassadorDiscount = ambassadorInfo && !useCreditDiscount
+    ? Math.round(basePrice * ambassadorInfo.discount_percent / 100)
+    : 0;
+  const discountAmount = creditDiscount || ambassadorDiscount;
+  const totalPrice = Math.max(1, basePrice - discountAmount);
 
   // Prix pour abonné Pro : base gratuite, options payantes
   const subOptionPrice = isSubscriber
@@ -171,17 +180,10 @@ export default function NewListingPage() {
     const validationError = validateForm();
     if (validationError) return setError(validationError);
 
-    // Si crédit disponible et plan basic sans boost → proposer l'upsell avant de soumettre
-    if (hasCredit && !boosted && !isSubscriber) {
-      setUpsellModal(true);
-      return;
-    }
-
-    await doSubmit(plan, false);
+    await doSubmit(plan, useCreditDiscount);
   }
 
   async function doSubmit(targetPlan: string, useCreditAsDiscount: boolean) {
-    setUpsellModal(false);
     setError("");
     const filledPhotos = form.photos.filter(Boolean);
     setSubmitting(true);
@@ -195,10 +197,9 @@ export default function NewListingPage() {
         is_boosted: boosted,
         sale_type: "marketplace",
         accepts_trade: false,
-        use_credit_as_discount: useCreditAsDiscount,
-        // Réduction : crédit upgrade (499 FCFA) OU code ambassadeur (pas les deux)
+        // Réduction : crédit (calculé côté serveur) OU code ambassadeur — jamais les deux
         ...(useCreditAsDiscount
-          ? { discount_amount: 499 }
+          ? {}
           : ambassadorInfo
           ? { ambassador_code: ambassadorInfo.code, discount_amount: discountAmount }
           : {}),
@@ -211,15 +212,6 @@ export default function NewListingPage() {
       }
       if (res.data.options_payment && res.data.payment_url) {
         window.location.href = res.data.payment_url;
-        return;
-      }
-      if (res.data.used_credit && res.data.payment_url) {
-        // Crédit pour le plan + boost TOP facturé via PayPlus
-        window.location.href = res.data.payment_url;
-        return;
-      }
-      if (res.data.used_credit) {
-        router.push("/seller?listing_published=1");
         return;
       }
       if (res.data.payment_url) {
@@ -501,26 +493,17 @@ export default function NewListingPage() {
               {/* Non-abonné */}
               {!isSubscriber && (
                 <>
-                  {ambassadorInfo && !hasCredit && (
+                  {discountAmount > 0 && (
                     <p className="text-xs line-through" style={{ color: "#8A99AA" }}>
                       {basePrice.toLocaleString("fr-FR")} FCFA
                     </p>
                   )}
                   <p className="text-xl font-black" style={{ color: "#0B1A2B" }}>
-                    {hasCredit && !boosted
-                      ? "Gratuit"
-                      : hasCredit && boosted
-                      ? `${(500).toLocaleString("fr-FR")} FCFA`
-                      : `${totalPrice.toLocaleString("fr-FR")} FCFA`}
+                    {totalPrice.toLocaleString("fr-FR")} FCFA
                   </p>
-                  {hasCredit && !boosted && (
-                    <p className="text-xs" style={{ color: "#8A99AA" }}>
-                      (valeur {selectedPlan.price.toLocaleString("fr-FR")} FCFA)
-                    </p>
-                  )}
-                  {hasCredit && boosted && (
-                    <p className="text-xs" style={{ color: "#8A99AA" }}>
-                      plan offert · boost TOP facturé
+                  {useCreditDiscount && (
+                    <p className="text-xs font-semibold" style={{ color: "#00B070" }}>
+                      −499 FCFA crédit offert
                     </p>
                   )}
                 </>
@@ -528,21 +511,22 @@ export default function NewListingPage() {
             </div>
           </div>
 
-          {!isSubscriber && hasCredit && (
-            <div className="mt-3 p-3 rounded-xl text-xs font-medium space-y-1"
-              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", color: "#B8860B" }}>
-              <p>🎁 Vous avez {user?.listing_credits} crédit{(user?.listing_credits ?? 0) > 1 ? "s" : ""} de publication.</p>
-              <p style={{ color: "#8A99AA", fontWeight: 400 }}>
-                {boosted
-                  ? "Plan offert (10 jours) · Boost TOP (500 FCFA) facturé séparément."
-                  : "⚠️ Annonce active 10 jours seulement avec un crédit (au lieu de 30 jours avec un paiement normal)."}
-              </p>
+          {!isSubscriber && useCreditDiscount && (
+            <div className="mt-3 p-3 rounded-xl flex items-start gap-2 text-xs font-medium"
+              style={{ background: "rgba(0,176,112,0.1)", color: "#00B070" }}>
+              <span>🎁</span>
+              <span>Votre crédit offert vous fait <strong>−499 FCFA</strong> sur ce plan : vous ne réglez que la différence.</span>
             </div>
           )}
-          {!isSubscriber && (user?.listing_credits ?? 0) > 0 && plan !== "basic" && (
-            <div className="mt-3 p-3 rounded-xl flex items-center gap-2 text-xs font-medium"
+          {!isSubscriber && creditCount > 0 && plan === "basic" && (
+            <div className="mt-3 p-3 rounded-xl flex items-start gap-2 text-xs font-medium"
               style={{ background: "rgba(245,158,11,0.1)", color: "#B8860B" }}>
-              🎁 Vos crédits de publication s&apos;appliquent uniquement au plan <strong>Basic (499 FCFA)</strong>.
+              <span>🎁</span>
+              <span>
+                Vous avez {creditCount} crédit{creditCount > 1 ? "s" : ""} offert{creditCount > 1 ? "s" : ""}.
+                Il s&apos;utilise en choisissant <strong>iPhone vérifié</strong> ou <strong>Vendeur vérifié</strong> :
+                le crédit vaut 499 FCFA de réduction et vous ne payez que la différence.
+              </span>
             </div>
           )}
         </div>
@@ -664,13 +648,9 @@ export default function NewListingPage() {
             ? subOptionPrice === 0
               ? "Publier gratuitement (abonnement Pro)"
               : `Payer les options — ${subOptionPrice.toLocaleString("fr-FR")} FCFA`
-            : hasCredit && !boosted
-            ? "Publier gratuitement (crédit)"
-            : hasCredit && boosted
-            ? "Publier avec crédit + payer le boost TOP — 500 FCFA"
             : `Continuer vers le paiement — ${totalPrice.toLocaleString("fr-FR")} FCFA`}
         </Button>
-        {!isSubscriber && ambassadorInfo && !hasCredit && (
+        {!isSubscriber && ambassadorInfo && !useCreditDiscount && (
           <p className="text-xs text-center -mt-2" style={{ color: "#00B070" }}>
             🎁 Code <strong>{ambassadorInfo.code}</strong> : −{ambassadorInfo.discount_percent}% appliqué ({discountAmount.toLocaleString("fr-FR")} FCFA économisés)
           </p>
@@ -679,110 +659,11 @@ export default function NewListingPage() {
         <p className="text-xs text-center pb-4" style={{ color: "#8A99AA" }}>
           {isSubscriber
             ? "Annonce active jusqu'à expiration de votre abonnement."
-            : hasCredit && !boosted
-            ? "Votre annonce sera active 10 jours avec le crédit."
             : "Votre annonce sera active 30 jours."}
           {!isSubscriber && (plan === "basic" ? " Publication immédiate après paiement." : " Expertise requise avant publication.")}
           {isSubscriber && plan === "verified_phone" && " Expertise physique requise."}
         </p>
       </div>
-
-      {/* ── Modal upsell crédit ── */}
-      {upsellModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
-          style={{ background: "rgba(11,26,43,0.55)" }}
-          onClick={e => { if (e.target === e.currentTarget) setUpsellModal(false); }}>
-          <div className="w-full max-w-md rounded-2xl p-6 space-y-4"
-            style={{ background: "white" }}>
-
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-bold text-lg" style={{ color: "#0B1A2B" }}>
-                  Profitez de votre crédit… ou faites mieux ?
-                </h2>
-                <p className="text-sm mt-1" style={{ color: "#8A99AA" }}>
-                  Votre crédit publie gratuitement, mais seulement <strong style={{ color: "#B8860B" }}>10 jours</strong>.
-                  En payant un plan supérieur, votre crédit vous offre <strong>499 FCFA</strong> de réduction, et vous gagnez 30 jours + la confiance des acheteurs.
-                </p>
-              </div>
-              <button onClick={() => setUpsellModal(false)} className="flex-shrink-0 mt-0.5">
-                <X size={18} style={{ color: "#8A99AA" }} />
-              </button>
-            </div>
-
-            {/* Option 1 : Continuer avec le crédit */}
-            <button
-              onClick={() => doSubmit("basic", false)}
-              className="w-full p-4 rounded-xl border-2 text-left transition-all"
-              style={{ borderColor: "rgba(11,26,43,0.12)", background: "white" }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-sm" style={{ color: "#0B1A2B" }}>Continuer avec le crédit</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#8A99AA" }}>Annonce active 10 jours · Publication immédiate</p>
-                </div>
-                <span className="font-black text-base" style={{ color: "#00B070" }}>Gratuit</span>
-              </div>
-            </button>
-
-            {/* Option 2 : iPhone vérifié */}
-            <button
-              onClick={() => doSubmit("verified_phone", true)}
-              disabled={submitting}
-              className="w-full p-4 rounded-xl border-2 text-left transition-all"
-              style={{ borderColor: "#00B070", background: "rgba(0,176,112,0.04)" }}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <BadgeCheck size={14} style={{ color: "#00B070" }} />
-                    <p className="font-bold text-sm" style={{ color: "#0B1A2B" }}>iPhone vérifié</p>
-                    <span className="text-xs px-1.5 py-0.5 rounded-full font-bold"
-                      style={{ background: "rgba(0,176,112,0.12)", color: "#00B070" }}>Recommandé</span>
-                  </div>
-                  <p className="text-xs" style={{ color: "#8A99AA" }}>
-                    30 jours · Expertise physique · Badge iPhone vérifié · Les acheteurs font +3× plus confiance
-                  </p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="font-black text-base" style={{ color: "#0B1A2B" }}>1 000 FCFA</p>
-                  <p className="text-xs line-through" style={{ color: "#8A99AA" }}>1 499 FCFA</p>
-                  <p className="text-xs font-semibold" style={{ color: "#00B070" }}>−499 FCFA crédit</p>
-                </div>
-              </div>
-            </button>
-
-            {/* Option 3 : Vendeur vérifié */}
-            <button
-              onClick={() => doSubmit("verified_seller", true)}
-              disabled={submitting}
-              className="w-full p-4 rounded-xl border-2 text-left transition-all"
-              style={{ borderColor: "#0B1A2B", background: "rgba(11,26,43,0.02)" }}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <BadgeCheck size={14} style={{ color: "#0B1A2B" }} />
-                    <p className="font-bold text-sm" style={{ color: "#0B1A2B" }}>Vendeur vérifié</p>
-                  </div>
-                  <p className="text-xs" style={{ color: "#8A99AA" }}>
-                    30 jours · KYC + expertise · Badge sur votre profil · Fidélisez vos acheteurs
-                  </p>
-                  {user?.kyc?.status !== "approved" && (
-                    <p className="text-xs mt-1 font-medium" style={{ color: "#B8860B" }}>
-                      ⚠️ KYC requis — <a href="/kyc" className="underline">vérifier mon identité</a>
-                    </p>
-                  )}
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="font-black text-base" style={{ color: "#0B1A2B" }}>2 500 FCFA</p>
-                  <p className="text-xs line-through" style={{ color: "#8A99AA" }}>2 999 FCFA</p>
-                  <p className="text-xs font-semibold" style={{ color: "#00B070" }}>−499 FCFA crédit</p>
-                </div>
-              </div>
-            </button>
-
-          </div>
-        </div>
-      )}
     </main>
   );
 }
