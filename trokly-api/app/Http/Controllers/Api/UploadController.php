@@ -5,7 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class UploadController extends Controller
 {
@@ -15,29 +16,25 @@ class UploadController extends Controller
             'file' => 'required|image|max:8192',
         ]);
 
-        $file      = $request->file('file');
-        $cloudName = config('services.cloudinary.cloud_name');
-        $apiKey    = config('services.cloudinary.api_key');
-        $apiSecret = config('services.cloudinary.api_secret');
-        $timestamp = time();
-        $signature = sha1("timestamp={$timestamp}{$apiSecret}");
+        $file = $request->file('file');
+        $ext  = strtolower($file->getClientOriginalExtension() ?: $file->extension() ?: 'jpg');
 
-        $response = Http::attach(
-            'file',
-            file_get_contents($file->getRealPath()),
-            $file->getClientOriginalName()
-        )->post("https://api.cloudinary.com/v1_1/{$cloudName}/image/upload", [
-            'api_key'   => $apiKey,
-            'timestamp' => $timestamp,
-            'signature' => $signature,
-        ]);
+        // Clé objet : uploads/AAAA/MM/uuid.ext (l'extension permet à Flysystem
+        // de déduire le bon Content-Type pour l'affichage navigateur).
+        $path = 'uploads/' . date('Y/m') . '/' . Str::uuid()->toString() . '.' . $ext;
 
-        if (!$response->successful()) {
+        try {
+            Storage::disk('r2')->put(
+                $path,
+                file_get_contents($file->getRealPath())
+            );
+        } catch (\Throwable $e) {
+            report($e);
             return response()->json(['message' => 'Erreur lors de l\'upload.'], 500);
         }
 
         return response()->json([
-            'url' => $response->json('secure_url'),
+            'url' => Storage::disk('r2')->url($path),
         ]);
     }
 }

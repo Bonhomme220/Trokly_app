@@ -60,6 +60,21 @@ return [
             'report' => false,
         ],
 
+        // Cloudflare R2 (compatible S3). Les images des annonces/KYC y sont stockées.
+        'r2' => [
+            'driver' => 's3',
+            'key' => env('R2_ACCESS_KEY_ID'),
+            'secret' => env('R2_SECRET_ACCESS_KEY'),
+            'region' => env('R2_DEFAULT_REGION', 'auto'),
+            'bucket' => env('R2_BUCKET'),
+            'endpoint' => env('R2_ENDPOINT'),
+            // URL publique de lecture (domaine personnalisé ou <hash>.r2.dev)
+            'url' => env('R2_PUBLIC_URL'),
+            'use_path_style_endpoint' => true,
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

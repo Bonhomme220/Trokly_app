@@ -52,7 +52,7 @@ Route::get('ambassador/codes/{code}/check', [AmbassadorController::class, 'check
 // Routes authentifiées
 Route::middleware('auth:sanctum')->group(function () {
 
-    // Upload Cloudinary
+    // Upload image (Cloudflare R2)
     Route::post('upload', [UploadController::class, 'store']);
 
     // KYC
